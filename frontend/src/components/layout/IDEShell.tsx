@@ -1,53 +1,61 @@
-import React from 'react'
-import { PanelGroup, Panel, PanelResizeHandle } from 'react-resizable-panels'
-import { TopBar } from './TopBar'
-import { LeftSidebar } from './LeftSidebar'
-import { CenterPanel } from './CenterPanel'
-import { RightSidebar } from './RightSidebar'
-import { StatusBar } from './StatusBar'
-import { CommandPalette } from '@/components/command-palette/CommandPalette'
+import React, { useEffect } from 'react'
+import { Sidebar } from './Sidebar'
+import { HomeScreen } from '@/components/home/HomeScreen'
+import { TaskWorkspace } from '@/components/task/TaskWorkspace'
+import { ProjectModal } from '@/components/project/ProjectModal'
 import { SettingsPanel } from '@/components/settings/SettingsPanel'
+import { ShortcutsModal } from '@/components/help/ShortcutsModal'
+import { CommandPalette } from '@/components/command-palette/CommandPalette'
 import { useUIStore } from '@/stores/ui.store'
 import { useTaskStore } from '@/stores/task.store'
 import { useAgentSSE } from '@/hooks/useAgent'
 
 export default function IDEShell() {
-  const rightPanelVisible = useUIStore((s) => s.rightPanelVisible)
+  const { currentView, toggleSidebar, setCommandPaletteOpen, setShortcutsModalOpen } = useUIStore()
   const activeTask = useTaskStore((s) => s.activeTask)
+
+  // Listen to live agent events for active task
   useAgentSSE(activeTask?.id ?? null)
 
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+K: Command Palette
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setCommandPaletteOpen(true)
+      }
+      // Ctrl+B: Toggle Sidebar
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault()
+        toggleSidebar()
+      }
+      // Ctrl+/: Shortcuts Help
+      if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+        e.preventDefault()
+        setShortcutsModalOpen(true)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [toggleSidebar, setCommandPaletteOpen, setShortcutsModalOpen])
+
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <TopBar />
+    <div className="h-screen w-screen overflow-hidden flex bg-[var(--bg-app)] text-[var(--text-primary)] font-sans antialiased">
+      {/* Minimal Collapsible Sidebar */}
+      <Sidebar />
 
-      <div className="flex-1 overflow-hidden">
-        <PanelGroup direction="horizontal" className="h-full">
-          <Panel defaultSize={20} minSize={14} maxSize={32}>
-            <LeftSidebar />
-          </Panel>
+      {/* Main Experience View */}
+      <main className="flex-1 h-screen overflow-hidden flex flex-col relative">
+        {currentView === 'home' ? <HomeScreen /> : <TaskWorkspace />}
+      </main>
 
-          <PanelResizeHandle className="w-px bg-[var(--border-color)] hover:bg-[var(--accent)] hover:w-0.5 cursor-col-resize transition-all" />
-
-          <Panel defaultSize={rightPanelVisible ? 55 : 80} minSize={30}>
-            <CenterPanel />
-          </Panel>
-
-          {rightPanelVisible && (
-            <>
-              <PanelResizeHandle className="w-px bg-[var(--border-color)] hover:bg-[var(--accent)] hover:w-0.5 cursor-col-resize transition-all" />
-              <Panel defaultSize={25} minSize={18} maxSize={40}>
-                <RightSidebar />
-              </Panel>
-            </>
-          )}
-        </PanelGroup>
-      </div>
-
-      <StatusBar />
-
-      {/* Global overlays */}
-      <CommandPalette />
+      {/* Global Modals & Overlays */}
+      <ProjectModal />
       <SettingsPanel />
+      <ShortcutsModal />
+      <CommandPalette />
     </div>
   )
 }

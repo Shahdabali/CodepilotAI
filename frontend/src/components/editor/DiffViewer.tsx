@@ -2,17 +2,20 @@ import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { useTaskStore } from '@/stores/task.store'
-import { useProjectStore } from '@/stores/project.store'
+import { useUIStore } from '@/stores/ui.store'
 import type { FileDiff } from '@/types'
 import { cn } from '@/lib/utils'
+import { Check, X, RotateCcw, FileText, CheckCircle2 } from 'lucide-react'
 
 export function DiffViewer() {
-  const activeProject = useProjectStore((s) => s.activeProject)
   const activeTask = useTaskStore((s) => s.activeTask)
+  const { setWorkspaceTab } = useUIStore()
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
-  const [rejecting, setRejecting] = useState(false)
+  const [reverting, setReverting] = useState(false)
+  const [accepted, setAccepted] = useState(false)
+  const [actionMessage, setActionMessage] = useState<string | null>(null)
 
-  const { data: diffs = [], isLoading } = useQuery({
+  const { data: diffs = [], isLoading, refetch } = useQuery({
     queryKey: ['diffs', activeTask?.id],
     queryFn: () => api.tasks.getDiffs(activeTask!.id),
     enabled: !!activeTask?.id,
@@ -25,31 +28,39 @@ export function DiffViewer() {
     ? diffs.find((d) => d.filePath === selectedFile)
     : diffs[0]
 
-  async function handleRollback() {
+  const handleAccept = () => {
+    setAccepted(true)
+    setActionMessage('Changes accepted and kept in project.')
+    setTimeout(() => setActionMessage(null), 3500)
+  }
+
+  const handleRevert = async () => {
     if (!activeTask) return
-    setRejecting(true)
+    setReverting(true)
+    setActionMessage(null)
     try {
       await api.tasks.rollback(activeTask.id)
+      setActionMessage('All changes reverted back to previous state.')
+      refetch()
     } catch {
-      // ignore
+      setActionMessage('Failed to revert changes.')
     } finally {
-      setRejecting(false)
+      setReverting(false)
     }
   }
 
   if (!activeTask) {
     return (
-      <div className="flex h-full items-center justify-center text-[var(--text-muted)] flex-col gap-3">
-        <div className="text-5xl opacity-30">📊</div>
-        <p className="text-sm">No active task</p>
-        <p className="text-xs opacity-60">Start a task to see file changes</p>
+      <div className="flex h-full items-center justify-center text-[var(--text-muted)] flex-col gap-2 p-6">
+        <p className="text-sm font-medium">No active task</p>
+        <p className="text-xs">Run a task to review generated code changes.</p>
       </div>
     )
   }
 
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center">
+      <div className="flex h-full items-center justify-center p-6">
         <div className="w-5 h-5 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
       </div>
     )
@@ -57,97 +68,144 @@ export function DiffViewer() {
 
   if (diffs.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center text-[var(--text-muted)] flex-col gap-3">
-        <div className="text-4xl opacity-30">✨</div>
-        <p className="text-sm">No file changes yet</p>
+      <div className="flex h-full items-center justify-center text-[var(--text-muted)] flex-col gap-2 p-6">
+        <p className="text-sm font-medium">No file changes recorded</p>
+        <p className="text-xs">This task did not modify any files.</p>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border-color)] bg-[var(--bg-secondary)] shrink-0">
+    <div className="flex flex-col h-full bg-[var(--bg-app)]">
+      {/* Review Actions Top Bar */}
+      <div className="h-12 px-4 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)] flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <span className="text-xs font-medium text-[var(--text-primary)]">
-            {diffs.length} file{diffs.length !== 1 ? 's' : ''} changed
+          <span className="text-xs font-semibold text-[var(--text-primary)]">
+            {diffs.length} {diffs.length === 1 ? 'file' : 'files'} changed
           </span>
-          <span className="text-xs text-green-400">+{totalAdditions}</span>
-          <span className="text-xs text-red-400">-{totalDeletions}</span>
+          <span className="text-xs font-mono font-medium text-[var(--success)]">
+            +{totalAdditions}
+          </span>
+          <span className="text-xs font-mono font-medium text-[var(--danger)]">
+            -{totalDeletions}
+          </span>
+          {actionMessage && (
+            <span className="text-xs text-[var(--accent)] animate-in fade-in ml-2">
+              {actionMessage}
+            </span>
+          )}
         </div>
-        <button
-          onClick={handleRollback}
-          disabled={rejecting}
-          className="text-xs px-2 py-1 rounded bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30 transition-colors disabled:opacity-50"
-        >
-          {rejecting ? 'Rolling back…' : 'Rollback all'}
-        </button>
+
+        {/* [ Accept ] [ Reject ] [ Revert ] Controls */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleAccept}
+            disabled={accepted}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[var(--success)]/15 text-[var(--success)] hover:bg-[var(--success)]/25 border border-[var(--success)]/30 transition-colors disabled:opacity-50"
+          >
+            <Check size={13} />
+            <span>{accepted ? 'Accepted' : 'Accept'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleRevert}
+            disabled={reverting}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[var(--danger)]/10 text-[var(--danger)] hover:bg-[var(--danger)]/20 border border-[var(--danger)]/20 transition-colors disabled:opacity-50"
+          >
+            <RotateCcw size={13} />
+            <span>{reverting ? 'Reverting…' : 'Revert'}</span>
+          </button>
+        </div>
       </div>
 
+      {/* Main Diff Content Area */}
       <div className="flex flex-1 overflow-hidden">
-        {/* File list */}
-        <div className="w-48 border-r border-[var(--border-color)] overflow-y-auto shrink-0 bg-[var(--bg-secondary)]">
-          {diffs.map((diff) => (
-            <button
-              key={diff.filePath}
-              onClick={() => setSelectedFile(diff.filePath)}
-              className={cn(
-                'w-full px-3 py-2 text-left text-xs border-b border-[var(--border-color)]/50 transition-colors',
-                (selectedFile === diff.filePath || (!selectedFile && diff === diffs[0]))
-                  ? 'bg-[var(--accent)]/15 text-[var(--accent)]'
-                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
-              )}
-            >
-              <div className="font-mono truncate">{diff.filePath.split('/').pop() || diff.filePath.split('\\').pop()}</div>
-              <div className="flex gap-2 mt-0.5">
-                {diff.isNew && <span className="text-green-400">NEW</span>}
-                {diff.isDeleted && <span className="text-red-400">DEL</span>}
-                {!diff.isNew && !diff.isDeleted && (
-                  <>
-                    <span className="text-green-400">+{diff.additions}</span>
-                    <span className="text-red-400">-{diff.deletions}</span>
-                  </>
+        {/* File Navigator Sidebar */}
+        <div className="w-56 border-r border-[var(--border-subtle)] bg-[var(--bg-surface)] overflow-y-auto shrink-0 py-1">
+          {diffs.map((diff) => {
+            const fileName = diff.filePath.split(/[\\/]/).pop() || diff.filePath
+            const isSelected = selectedFile === diff.filePath || (!selectedFile && diff === diffs[0])
+
+            return (
+              <button
+                key={diff.filePath}
+                onClick={() => setSelectedFile(diff.filePath)}
+                className={cn(
+                  'w-full px-3 py-2 text-left text-xs transition-colors flex items-center justify-between gap-2',
+                  isSelected
+                    ? 'bg-[var(--accent-subtle)] text-[var(--accent)] font-medium border-l-2 border-[var(--accent)]'
+                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
                 )}
-              </div>
-            </button>
-          ))}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <FileText size={13} className="shrink-0 text-[var(--text-muted)]" />
+                  <span className="truncate font-mono text-[11px]">{fileName}</span>
+                </div>
+                <div className="flex items-center gap-1 font-mono text-[10px] shrink-0">
+                  {diff.isNew ? (
+                    <span className="text-[var(--success)] font-semibold">NEW</span>
+                  ) : diff.isDeleted ? (
+                    <span className="text-[var(--danger)] font-semibold">DEL</span>
+                  ) : (
+                    <>
+                      <span className="text-[var(--success)]">+{diff.additions}</span>
+                      <span className="text-[var(--danger)]">-{diff.deletions}</span>
+                    </>
+                  )}
+                </div>
+              </button>
+            )
+          })}
         </div>
 
-        {/* Diff content */}
-        <div className="flex-1 overflow-auto p-0 font-mono text-xs">
-          {currentDiff && <DiffContent diff={currentDiff} />}
+        {/* Diff Hunks Display */}
+        <div className="flex-1 overflow-auto bg-[var(--bg-input)] font-mono text-xs p-2">
+          {currentDiff && <DiffHunks diff={currentDiff} />}
         </div>
       </div>
     </div>
   )
 }
 
-function DiffContent({ diff }: { diff: FileDiff }) {
+function DiffHunks({ diff }: { diff: FileDiff }) {
   const lines = diff.diff.split('\n')
+
   return (
-    <div className="min-w-0">
-      <div className="px-3 py-1.5 text-xs font-mono text-[var(--text-muted)] bg-[var(--bg-tertiary)]/50 border-b border-[var(--border-color)] sticky top-0">
-        {diff.filePath}
+    <div className="min-w-full rounded-xl overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
+      <div className="px-3.5 py-2 text-xs font-mono text-[var(--text-secondary)] bg-[var(--bg-card)] border-b border-[var(--border-subtle)] flex items-center justify-between">
+        <span className="truncate">{diff.filePath}</span>
+        <div className="flex items-center gap-2 text-[11px]">
+          <span className="text-[var(--success)] font-mono">+{diff.additions}</span>
+          <span className="text-[var(--danger)] font-mono">-{diff.deletions}</span>
+        </div>
       </div>
-      {lines.map((line, i) => {
-        const isAdd = line.startsWith('+') && !line.startsWith('+++')
-        const isDel = line.startsWith('-') && !line.startsWith('---')
-        const isHunk = line.startsWith('@@')
-        return (
-          <div
-            key={i}
-            className={cn(
-              'px-3 py-0.5 leading-5 whitespace-pre-wrap break-all',
-              isAdd && 'bg-green-500/10 text-green-300',
-              isDel && 'bg-red-500/10 text-red-300',
-              isHunk && 'bg-[var(--accent)]/10 text-[var(--accent)] text-xs py-1',
-              !isAdd && !isDel && !isHunk && 'text-[var(--text-secondary)]'
-            )}
-          >
-            {line || ' '}
-          </div>
-        )
-      })}
+
+      <div className="divide-y divide-[var(--border-subtle)]/30">
+        {lines.map((line, i) => {
+          const isAdd = line.startsWith('+') && !line.startsWith('+++')
+          const isDel = line.startsWith('-') && !line.startsWith('---')
+          const isHunk = line.startsWith('@@')
+
+          return (
+            <div
+              key={i}
+              className={cn(
+                'px-3.5 py-1 leading-relaxed whitespace-pre-wrap break-all flex items-start gap-3',
+                isAdd && 'bg-[var(--success)]/10 text-[var(--success)] font-medium',
+                isDel && 'bg-[var(--danger)]/10 text-[var(--danger)] line-through opacity-80',
+                isHunk && 'bg-[var(--accent-subtle)] text-[var(--accent)] font-semibold text-[11px] py-1.5',
+                !isAdd && !isDel && !isHunk && 'text-[var(--text-secondary)]'
+              )}
+            >
+              <span className="w-8 text-[10px] text-[var(--text-muted)] select-none text-right shrink-0">
+                {i + 1}
+              </span>
+              <span className="flex-1 font-mono">{line || ' '}</span>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
