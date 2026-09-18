@@ -35,6 +35,35 @@ async function start() {
     await fastify.register(agentPlugin);
     await fastify.register(terminalPlugin);
     await fastify.register(aiPlugin);
+
+    // Serve frontend SPA in production if built
+    try {
+      const { fileURLToPath } = await import('url');
+      const path = (await import('path')).default;
+      const fs = (await import('fs')).default;
+      const fastifyStatic = (await import('@fastify/static')).default;
+      
+      const currentDir = path.dirname(fileURLToPath(import.meta.url));
+      const frontendDist = path.resolve(currentDir, '../../frontend/dist');
+      
+      if (fs.existsSync(frontendDist)) {
+        await fastify.register(fastifyStatic, {
+          root: frontendDist,
+          prefix: '/',
+        });
+        
+        fastify.setNotFoundHandler((req, reply) => {
+          const url = req.raw.url || '';
+          if (url.startsWith('/api') || url.startsWith('/sse') || url.startsWith('/ws')) {
+            reply.code(404).send({ error: 'Endpoint not found' });
+          } else {
+            reply.sendFile('index.html');
+          }
+        });
+      }
+    } catch {
+      // Ignore if static assets cannot be loaded
+    }
     
     const port = config.port || 3000;
     await fastify.listen({ port, host: '0.0.0.0' });

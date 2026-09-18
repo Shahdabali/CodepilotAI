@@ -5,7 +5,8 @@ export function subscribeToTask(
   onEvent: (e: AgentEvent) => void,
   onError?: (e: Event) => void
 ): () => void {
-  const url = `/sse/agent/${taskId}`
+  const apiBase = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
+  const url = `${apiBase}/sse/agent/${taskId}`
   let es: EventSource
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
   let closed = false

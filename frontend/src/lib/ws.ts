@@ -12,9 +12,19 @@ export class TerminalWebSocket {
   }
 
   connect(): void {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const host = window.location.host
-    const url = `${protocol}//${host}/ws/terminal/${this.sessionId}?projectPath=${encodeURIComponent(this.projectPath)}`
+    let wsBase = import.meta.env.VITE_WS_URL as string | undefined;
+    if (!wsBase && import.meta.env.VITE_API_URL) {
+      wsBase = (import.meta.env.VITE_API_URL as string)
+        .replace(/^https:\/\//, 'wss://')
+        .replace(/^http:\/\//, 'ws://')
+        .replace(/\/+$/, '');
+    }
+    if (!wsBase) {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = window.location.host;
+      wsBase = `${protocol}//${host}`;
+    }
+    const url = `${wsBase}/ws/terminal/${this.sessionId}?projectPath=${encodeURIComponent(this.projectPath)}`
 
     this.ws = new WebSocket(url)
 

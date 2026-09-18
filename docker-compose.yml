@@ -1,0 +1,23 @@
+services:
+  codepilot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: codepilot-ai
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - HOST=0.0.0.0
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY:-}
+      - GITHUB_API_KEY=${GITHUB_API_KEY:-}
+      - DEFAULT_AUTONOMY_LEVEL=BALANCED
+    volumes:
+      - codepilot-data:/app
+    restart: unless-stopped
+
+volumes:
+  codepilot-data:

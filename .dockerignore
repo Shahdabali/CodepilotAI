@@ -1,0 +1,7 @@
+node_modules
+.git
+.codepilot.db*
+dist
+frontend/dist
+backend/dist
+*.log
