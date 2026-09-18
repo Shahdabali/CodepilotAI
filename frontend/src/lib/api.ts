@@ -1,4 +1,15 @@
-import { Project, Task, TaskStep, FileDiff, FileNode, GitStatus, AppSettings } from '../types';
+import {
+  Project,
+  Task,
+  TaskStep,
+  FileDiff,
+  FileNode,
+  GitStatus,
+  AppSettings,
+  ProvidersResponse,
+  ModelInfo,
+  HealthStatus,
+} from '../types';
 
 const BASE_URL = '/api';
 
@@ -20,7 +31,7 @@ export const api = {
     get: (id: string) => fetchApi<Project>(`/projects/${id}`),
     create: (path: string) => fetchApi<Project>('/projects', { method: 'POST', body: JSON.stringify({ path }) }),
     update: (id: string, data: Partial<Project>) => fetchApi<Project>(`/projects/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-    delete: (id: string) => fetchApi<{success: boolean}>(`/projects/${id}`, { method: 'DELETE' }),
+    delete: (id: string) => fetchApi<{ success: boolean }>(`/projects/${id}`, { method: 'DELETE' }),
     analyze: (id: string) => fetchApi<Project>(`/projects/${id}/analyze`, { method: 'POST' }),
   },
   tasks: {
@@ -35,16 +46,31 @@ export const api = {
   },
   files: {
     getTree: (projectId: string) => fetchApi<FileNode[]>(`/projects/${projectId}/files/tree`),
-    getContent: (projectId: string, path: string) => fetchApi<{content: string}>(`/projects/${projectId}/files/content?path=${encodeURIComponent(path)}`),
-    writeContent: (projectId: string, path: string, content: string) => fetchApi<{success: boolean}>(`/projects/${projectId}/files/content`, { method: 'PUT', body: JSON.stringify({ path, content }) }),
+    getContent: (projectId: string, path: string) => fetchApi<{ content: string }>(`/projects/${projectId}/files/content?path=${encodeURIComponent(path)}`),
+    writeContent: (projectId: string, path: string, content: string) => fetchApi<{ success: boolean }>(`/projects/${projectId}/files/content`, { method: 'PUT', body: JSON.stringify({ path, content }) }),
   },
   git: {
     getStatus: (projectId: string) => fetchApi<GitStatus>(`/projects/${projectId}/git/status`),
-    getDiff: (projectId: string) => fetchApi<{diff: string}>(`/projects/${projectId}/git/diff`),
-    commit: (projectId: string, message: string) => fetchApi<{success: boolean}>(`/projects/${projectId}/git/commit`, { method: 'POST', body: JSON.stringify({ message }) }),
+    getDiff: (projectId: string) => fetchApi<{ diff: string }>(`/projects/${projectId}/git/diff`),
+    commit: (projectId: string, message: string) => fetchApi<{ success: boolean }>(`/projects/${projectId}/git/commit`, { method: 'POST', body: JSON.stringify({ message }) }),
   },
   settings: {
     get: () => fetchApi<AppSettings>('/settings'),
     update: (data: Partial<AppSettings>) => fetchApi<AppSettings>('/settings', { method: 'PUT', body: JSON.stringify(data) }),
-  }
+  },
+  ai: {
+    getProviders: () => fetchApi<ProvidersResponse>('/ai/providers'),
+    getModels: () => fetchApi<{ models: ModelInfo[] }>('/ai/models'),
+    test: (providerId: string, apiKey?: string, baseUrl?: string) =>
+      fetchApi<{ success: boolean; health: HealthStatus }>('/ai/test', {
+        method: 'POST',
+        body: JSON.stringify({ providerId, apiKey, baseUrl }),
+      }),
+    setRoutingMode: (mode: string) =>
+      fetchApi<{ success: boolean; mode: string }>('/ai/routing-mode', {
+        method: 'POST',
+        body: JSON.stringify({ mode }),
+      }),
+    getMetrics: () => fetchApi<ProvidersResponse['metrics']>('/ai/metrics'),
+  },
 };

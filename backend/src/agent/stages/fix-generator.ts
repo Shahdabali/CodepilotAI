@@ -1,5 +1,5 @@
 import { TaskContext } from '../context.js';
-import { createAIProvider } from '../../ai/index.js';
+import { getAIRouter } from '../../ai/index.js';
 import { FileManager } from '../../workspace/file-manager.js';
 
 export class FixGenerator {
@@ -8,7 +8,7 @@ export class FixGenerator {
     
     ctx.emit({ type: 'DEBUGGING_FIX', taskId: ctx.taskId, data: { message: 'Generating fixes' } });
     
-    const ai = createAIProvider({ apiKey: process.env.GEMINI_API_KEY || '', model: process.env.GEMINI_MODEL || 'gemini-2.5-flash' });
+    const ai = getAIRouter();
     const fileManager = new FileManager(ctx.project.path, ctx.taskId);
     
     for (const file of ctx.filesChanged) {
@@ -24,13 +24,13 @@ ${content}
 \`\`\`
 Fix the code. Return ONLY the fixed raw code without markdown wrappers.`;
 
-      const response = await ai.generate(prompt);
+      const response = await ai.generate(prompt, undefined, 'DEBUGGING');
       
       let cleanCode = response.trim();
-      if (cleanCode.startsWith('\`\`\`')) {
+      if (cleanCode.startsWith('```')) {
         const firstNewLine = cleanCode.indexOf('\n');
         cleanCode = cleanCode.substring(firstNewLine + 1);
-        if (cleanCode.endsWith('\`\`\`')) {
+        if (cleanCode.endsWith('```')) {
           cleanCode = cleanCode.substring(0, cleanCode.length - 3);
         }
       }

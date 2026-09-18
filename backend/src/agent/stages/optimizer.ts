@@ -1,5 +1,5 @@
 import { TaskContext } from '../context.js';
-import { createAIProvider } from '../../ai/index.js';
+import { getAIRouter } from '../../ai/index.js';
 import { FileManager } from '../../workspace/file-manager.js';
 
 interface OptimizationSuggestion {
@@ -12,7 +12,7 @@ export class Optimizer {
   async run(ctx: TaskContext): Promise<void> {
     ctx.emit({ type: 'OPTIMIZING', taskId: ctx.taskId, data: { message: 'Analyzing code for optimizations' } });
     
-    const ai = createAIProvider({ apiKey: process.env.GEMINI_API_KEY || '', model: process.env.GEMINI_MODEL || 'gemini-2.5-flash' });
+    const ai = getAIRouter();
     const fileManager = new FileManager(ctx.project.path, ctx.taskId);
     
     const suggestions: OptimizationSuggestion[] = [];
@@ -47,20 +47,25 @@ File: ${file}`;
       };
 
       try {
-        const result = await ai.structuredOutput<{suggestions: OptimizationSuggestion[]}>(prompt, schema);
+        const result = await ai.structuredOutput<{ suggestions: OptimizationSuggestion[] }>(
+          prompt,
+          schema,
+          undefined,
+          'OPTIMIZATION'
+        );
         suggestions.push(...result.suggestions);
         
         // Auto-apply LOW risk optimizations
         const lowRisk = result.suggestions.filter(s => s.riskLevel === 'LOW');
         if (lowRisk.length > 0) {
           const fixPrompt = `Apply these optimizations to the code: ${JSON.stringify(lowRisk)}\n\nOriginal Code:\n\`\`\`\n${content}\n\`\`\`\nReturn ONLY the new raw code.`;
-          const optimized = await ai.generate(fixPrompt);
+          const optimized = await ai.generate(fixPrompt, undefined, 'OPTIMIZATION');
           
           let cleanCode = optimized.trim();
-          if (cleanCode.startsWith('\`\`\`')) {
+          if (cleanCode.startsWith('```')) {
             const firstNewLine = cleanCode.indexOf('\n');
             cleanCode = cleanCode.substring(firstNewLine + 1);
-            if (cleanCode.endsWith('\`\`\`')) {
+            if (cleanCode.endsWith('```')) {
               cleanCode = cleanCode.substring(0, cleanCode.length - 3);
             }
           }

@@ -1,7 +1,7 @@
 import { simpleGit } from 'simple-git'
 import type { SimpleGit } from 'simple-git'
 import type { TaskContext } from '../agent/context.js'
-import { createAIProvider } from '../ai/index.js'
+import { getAIRouter } from '../ai/index.js'
 
 export interface GitStatus {
   isRepo: boolean
@@ -77,15 +77,12 @@ export class GitService {
   }
 
   async generateCommitMessage(ctx: TaskContext): Promise<string> {
-    const ai = createAIProvider({
-      apiKey: process.env.GEMINI_API_KEY || '',
-      model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
-    })
+    const ai = getAIRouter()
     const prompt = `Generate a concise conventional commit message (50 chars max) for these changes.
 Command: ${ctx.command}
 Files changed: ${ctx.filesChanged.join(', ')}
 Reply with ONLY the commit message, no quotes.`
-    const msg = await ai.generate(prompt)
+    const msg = await ai.generate(prompt, undefined, 'DOCUMENTATION')
     return msg.trim().replace(/^['"]+|['"]+$/g, '').slice(0, 72)
   }
 }

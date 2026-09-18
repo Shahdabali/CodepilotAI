@@ -11,12 +11,15 @@ import { gitPlugin } from './routes/git.js';
 import { settingsPlugin } from './routes/settings.js';
 import { agentPlugin } from './routes/agent.js';
 import { terminalPlugin } from './routes/terminal.js';
+import { aiPlugin } from './routes/ai.js';
+import { aiRouter } from './ai/router.js';
 
 const fastify = Fastify({ logger: true });
 
 async function start() {
   try {
     await initDb();
+    await aiRouter.syncWithSettings();
     
     await fastify.register(cors, {
       origin: process.env.CORS_ORIGIN || '*'
@@ -31,6 +34,7 @@ async function start() {
     await fastify.register(settingsPlugin);
     await fastify.register(agentPlugin);
     await fastify.register(terminalPlugin);
+    await fastify.register(aiPlugin);
     
     const port = config.port || 3000;
     await fastify.listen({ port, host: '0.0.0.0' });

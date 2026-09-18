@@ -1,11 +1,11 @@
 import { TaskContext } from '../context.js';
-import { createAIProvider } from '../../ai/index.js';
+import { getAIRouter } from '../../ai/index.js';
 
 export class VerificationEngine {
   async run(ctx: TaskContext): Promise<boolean> {
     ctx.emit({ type: 'VERIFYING', taskId: ctx.taskId, data: { message: 'Verifying task completion' } });
     
-    const ai = createAIProvider({ apiKey: process.env.GEMINI_API_KEY || '', model: process.env.GEMINI_MODEL || 'gemini-2.5-flash' });
+    const ai = getAIRouter();
     
     const prompt = `Original Command: ${ctx.command}
 Files Changed: ${JSON.stringify(ctx.filesChanged)}
@@ -24,7 +24,12 @@ Did we successfully satisfy the original command? Return true or false.`;
     };
     
     try {
-      const result = await ai.structuredOutput<{verified: boolean, explanation: string}>(prompt, schema);
+      const result = await ai.structuredOutput<{ verified: boolean; explanation: string }>(
+        prompt,
+        schema,
+        undefined,
+        'CODE_REVIEW'
+      );
       ctx.emit({ type: 'VERIFYING_COMPLETE', taskId: ctx.taskId, data: result });
       return result.verified;
     } catch (e) {

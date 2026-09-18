@@ -48,7 +48,79 @@ export interface TestResult {
   passed: boolean; total: number; passed_count: number; failed_count: number; skipped_count: number; duration: number; failures: TestFailure[]; output: string;
 }
 export interface TestFailure { test: string; message: string; location?: string; }
+
+export interface HealthStatus {
+  providerId: string;
+  providerName: string;
+  status: 'available' | 'degraded' | 'rate_limited' | 'unconfigured' | 'error';
+  latencyMs?: number;
+  message?: string;
+  modelsCount: number;
+  lastChecked: string;
+}
+
+export interface ModelCapability {
+  coding: boolean;
+  reasoning: boolean;
+  tools: boolean;
+  streaming: boolean;
+  vision: boolean;
+  json: boolean;
+}
+
+export interface ModelInfo {
+  id: string;
+  name: string;
+  provider: string;
+  contextWindow: number;
+  maxOutputTokens: number;
+  capabilities: ModelCapability;
+  rateLimits?: { rpm?: number; rpd?: number; tpm?: number };
+  recommendedFor: string[];
+  isFree: boolean;
+}
+
+export interface ProviderItem {
+  id: string;
+  name: string;
+  description: string;
+  freeTierInfo: string;
+  websiteUrl: string;
+  docsUrl: string;
+  envVar: string;
+  settingKey: string;
+  requiresKey: boolean;
+  isConfigured: boolean;
+  health: HealthStatus;
+  models: ModelInfo[];
+}
+
+export interface ProvidersResponse {
+  providers: ProviderItem[];
+  routingMode: string;
+  metrics: {
+    totalRequests: number;
+    successfulRequests: number;
+    fallbackCount: number;
+    rateLimitHits: number;
+    requestsByProvider: Record<string, number>;
+    activeRoutingMode: string;
+  };
+}
+
 export interface AppSettings {
-  autonomyLevel: AutonomyLevel; geminiApiKey: string; geminiModel: string;
-  theme: 'dark'|'light'; fontSize: number; maxIterations: number; executionTimeout: number;
+  autonomyLevel: AutonomyLevel;
+  geminiApiKey: string;
+  geminiModel: string;
+  groqApiKey?: string;
+  openRouterApiKey?: string;
+  nvidiaApiKey?: string;
+  githubApiKey?: string;
+  ollamaEnabled?: boolean | string;
+  ollamaBaseUrl?: string;
+  aiRoutingMode?: string;
+  theme: 'dark'|'light';
+  fontSize: number;
+  maxIterations: number;
+  executionTimeout: number;
 }

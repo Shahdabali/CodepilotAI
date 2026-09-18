@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useProjectStore } from '@/stores/project.store'
 import { useTaskStore } from '@/stores/task.store'
 import { useUIStore } from '@/stores/ui.store'
@@ -33,6 +34,19 @@ export function HomeScreen() {
   const { activeProject } = useProjectStore()
   const { addTask } = useTaskStore()
   const { setCurrentView, setProjectModalOpen, setSettingsOpen } = useUIStore()
+
+  const { data: providersData } = useQuery({
+    queryKey: ['ai-providers'],
+    queryFn: api.ai.getProviders,
+    staleTime: 30000,
+  })
+
+  const configuredCount = providersData?.providers?.filter((p) => p.isConfigured).length ?? 0
+  const activeMode = providersData?.routingMode ?? 'auto'
+  const activeProviderName =
+    activeMode === 'auto'
+      ? 'Auto Router'
+      : (providersData?.providers?.find((p) => p.id === activeMode)?.name ?? activeMode)
 
   useEffect(() => {
     textareaRef.current?.focus()
@@ -120,6 +134,23 @@ export function HomeScreen() {
                   <span>+ Add Project</span>
                 </button>
               )}
+
+              {/* Active AI Provider / Router Badge */}
+              <button
+                type="button"
+                onClick={() => setSettingsOpen(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] border border-[var(--border-subtle)] transition-colors"
+                title={`${activeProviderName} · ${configuredCount} active provider${configuredCount === 1 ? '' : 's'}. Click to configure in Settings.`}
+              >
+                <span
+                  className={cn(
+                    'w-1.5 h-1.5 rounded-full',
+                    configuredCount > 0 ? 'bg-emerald-400' : 'bg-zinc-500'
+                  )}
+                />
+                <Sparkles size={11} className="text-[var(--accent)]" />
+                <span className="max-w-[120px] truncate">{activeProviderName}</span>
+              </button>
 
               {/* Autonomy Selector */}
               <div className="relative group">
