@@ -19,7 +19,7 @@ export const projectsPlugin: FastifyPluginAsync = async (fastify) => {
 
   // POST /api/projects — create project from path
   fastify.post('/api/projects', async (request, reply) => {
-    const body = request.body as { path: string; name?: string }
+    const body = (request.body as { path?: string; name?: string } | undefined) ?? {}
     const projectPath = body.path?.trim()
     if (!projectPath) return reply.status(400).send({ error: 'path is required' })
 

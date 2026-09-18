@@ -3,14 +3,17 @@ import * as queries from '../db/queries.js';
 import { FileManager } from '../workspace/file-manager.js';
 
 export const filesPlugin: FastifyPluginAsync = async (fastify) => {
-  fastify.get('/api/projects/:id/files', async (request, reply) => {
+  const getTreeHandler = async (request: any, reply: any) => {
     const { id } = request.params as { id: string };
     const project = await queries.getProject(id);
     if (!project) return reply.status(404).send({ error: 'Project not found' });
     
     const fm = new FileManager(project.path, 'api');
     return fm.readFileTree();
-  });
+  };
+
+  fastify.get('/api/projects/:id/files', getTreeHandler);
+  fastify.get('/api/projects/:id/files/tree', getTreeHandler);
 
   fastify.get('/api/projects/:id/files/content', async (request, reply) => {
     const { id } = request.params as { id: string };

@@ -18,7 +18,8 @@ export const tasksPlugin: FastifyPluginAsync = async (fastify) => {
   // POST /api/projects/:projectId/tasks — create and run a task
   fastify.post('/api/projects/:projectId/tasks', async (request, reply) => {
     const { projectId } = request.params as { projectId: string }
-    const body = request.body as { command: string; mode?: string }
+    const body = (request.body as { command?: string; mode?: string } | undefined) ?? {}
+    if (!body.command?.trim()) return reply.status(400).send({ error: 'command is required' })
 
     const project = await queries.getProject(projectId)
     if (!project) return reply.status(404).send({ error: 'Project not found' })
