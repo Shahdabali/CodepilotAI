@@ -82,13 +82,13 @@ export function SettingsPanel() {
               Gemini Model
             </label>
             <select
-              value={form.geminiModel ?? 'gemini-2.5-flash'}
+              value={form.geminiModel ?? 'gemini-3.6-flash'}
               onChange={(e) => setForm((f) => ({ ...f, geminiModel: e.target.value }))}
               className="w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
             >
-              <option value="gemini-2.5-flash">gemini-2.5-flash (recommended)</option>
-              <option value="gemini-2.5-pro">gemini-2.5-pro</option>
+              <option value="gemini-3.6-flash">gemini-3.6-flash (recommended)</option>
               <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+              <option value="gemini-1.5-pro">gemini-1.5-pro</option>
             </select>
           </div>
 

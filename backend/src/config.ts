@@ -5,7 +5,7 @@ export const config = {
   host: process.env.HOST ?? '0.0.0.0',
   dbPath: process.env.DB_PATH ?? '.codepilot.db',
   geminiApiKey: process.env.GEMINI_API_KEY ?? '',
-  geminiModel: process.env.GEMINI_MODEL ?? 'gemini-2.5-flash',
+  geminiModel: process.env.GEMINI_MODEL ?? 'gemini-3.6-flash',
   maxIterations: parseInt(process.env.MAX_ITERATIONS ?? '10', 10),
   defaultAutonomyLevel: (process.env.DEFAULT_AUTONOMY_LEVEL ?? 'BALANCED') as AutonomyLevel,
   executionTimeout: parseInt(process.env.EXECUTION_TIMEOUT ?? '60000', 10),
