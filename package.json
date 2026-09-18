@@ -1,0 +1,17 @@
+{
+  "name": "codepilot-ai",
+  "version": "0.1.0",
+  "description": "CodePilot AI — Autonomous AI-powered coding assistant",
+  "private": true,
+  "scripts": {
+    "dev": "cmd /c \"start cmd /k \"cd backend && npm run dev\" && start cmd /k \"cd frontend && npm run dev\"\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "cd backend && npm run build && cd ../frontend && npm run build",
+    "typecheck": "cd backend && npm run typecheck && cd ../frontend && npm run typecheck"
+  },
+  "workspaces": [
+    "backend",
+    "frontend"
+  ]
+}
