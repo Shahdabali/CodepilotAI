@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { useUIStore } from '@/stores/ui.store'
-import type { AppSettings, AutonomyLevel, ProvidersResponse, HealthStatus } from '@/types'
+import type { AppSettings, AutonomyLevel, ProvidersResponse, HealthStatus, NvidiaDetailedHealth } from '@/types'
 import {
   X,
   Sliders,
@@ -22,6 +22,8 @@ import {
   Server,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Modal, ModalTitle } from '@/components/ui/Modal'
+import { toast } from '@/components/ui/toast'
 
 type SettingsTab = 'general' | 'agent' | 'ai' | 'execution' | 'git'
 
@@ -39,6 +41,9 @@ export function SettingsPanel() {
   const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({})
   const [testingProvider, setTestingProvider] = useState<string | null>(null)
   const [testResults, setTestResults] = useState<Record<string, { success: boolean; message: string; latency?: number }>>({})
+  const [nvidiaDiagnostics, setNvidiaDiagnostics] = useState<NvidiaDetailedHealth | null>(null)
+  const [nvidiaModelsList, setNvidiaModelsList] = useState<Array<{ id: string; name: string }>>([])
+  const [loadingNvidiaModels, setLoadingNvidiaModels] = useState(false)
 
   const { data: settings, refetch: refetchSettings } = useQuery({
     queryKey: ['settings'],
@@ -59,16 +64,17 @@ export function SettingsPanel() {
     if (settings) setForm(settings)
   }, [settings])
 
-  if (!settingsOpen) return null
-
   const toggleKeyVisibility = (providerId: string) => {
     setVisibleKeys((prev) => ({ ...prev, [providerId]: !prev[providerId] }))
   }
 
-  const handleTestConnection = async (providerId: string, apiKey?: string, baseUrl?: string) => {
+  const handleTestConnection = async (providerId: string, apiKey?: string, baseUrl?: string, model?: string) => {
     setTestingProvider(providerId)
     try {
-      const res = await api.ai.test(providerId, apiKey, baseUrl)
+      const res = await api.ai.test(providerId, apiKey, baseUrl, model)
+      if (providerId === 'nvidia' && res.detailedHealth) {
+        setNvidiaDiagnostics(res.detailedHealth)
+      }
       setTestResults((prev) => ({
         ...prev,
         [providerId]: {
@@ -102,31 +108,35 @@ export function SettingsPanel() {
       setTimeout(() => setSaved(false), 2000)
       refetchSettings()
       refetchProviders()
-    } catch {
-      // ignore
+      toast.success('Settings saved')
+    } catch (err: any) {
+      toast.error('Could not save settings', err?.message)
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
-      onClick={() => setSettingsOpen(false)}
+    <Modal
+      open={settingsOpen}
+      onOpenChange={setSettingsOpen}
+      title="Settings"
+      description="Autonomy, AI providers, execution and Git preferences"
+      className="max-w-3xl h-[640px] max-h-[92vh]"
+      visibleTitle
     >
-      <div
-        className="w-full max-w-3xl bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[640px]"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <>
         {/* Modal Top Header */}
         <div className="h-14 px-6 border-b border-[var(--border-subtle)] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
-            <h2 className="text-base font-semibold text-[var(--text-primary)]">Settings</h2>
+            <ModalTitle className="text-base font-semibold text-[var(--text-primary)]">Settings</ModalTitle>
             <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-muted)]">
               v0.1.0
             </span>
           </div>
           <button
+            type="button"
+            aria-label="Close settings"
             onClick={() => setSettingsOpen(false)}
             className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
           >
@@ -336,12 +346,16 @@ export function SettingsPanel() {
                     className="w-full bg-[var(--bg-input)] border border-[var(--border-subtle)] rounded-lg px-3 py-2 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)]"
                   >
                     <option value="auto">⚡ Automatic (Intelligent Task-Based Router + Auto-Fallback)</option>
-                    <option value="gemini">Google Gemini (Default)</option>
-                    <option value="groq">Groq Cloud (Ultra-fast 500+ tok/s)</option>
-                    <option value="openrouter">OpenRouter (35+ Free Models)</option>
-                    <option value="nvidia">NVIDIA NIM</option>
-                    <option value="github">GitHub Models</option>
-                    <option value="ollama">Ollama (Local Offline)</option>
+                    <option value="nvidia-only">🛡️ NVIDIA NIM Only (Strict - No Fallback)</option>
+                    <option value="gemini-only">🛡️ Google Gemini Only (Strict - No Fallback)</option>
+                    <option value="groq-only">🛡️ Groq Cloud Only (Strict - No Fallback)</option>
+                    <option value="openrouter-only">🛡️ OpenRouter Only (Strict - No Fallback)</option>
+                    <option value="github-only">🛡️ GitHub Models Only (Strict - No Fallback)</option>
+                    <option value="ollama-only">🛡️ Ollama Only (Strict - No Fallback)</option>
+                    <option value="nvidia">NVIDIA NIM (Preferred with Fallback)</option>
+                    <option value="gemini">Google Gemini (Preferred with Fallback)</option>
+                    <option value="groq">Groq Cloud (Preferred with Fallback)</option>
+                    <option value="openrouter">OpenRouter (Preferred with Fallback)</option>
                   </select>
                 </div>
 
@@ -494,45 +508,192 @@ export function SettingsPanel() {
                   </div>
 
                   {/* 4. NVIDIA NIM */}
-                  <div className="p-3.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] space-y-3">
+                  <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] space-y-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-semibold text-[var(--text-primary)]">NVIDIA NIM</span>
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20 font-mono">
-                          Enterprise DGX
+                          Enterprise DGX / Self-Hosted
                         </span>
                       </div>
                       <StatusBadge status={getProviderStatus(providersData, 'nvidia')} />
                     </div>
-                    <p className="text-[11px] text-[var(--text-muted)]">
-                      1,000 free credits on build.nvidia.com. High-concurrency enterprise models.
+                    <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
+                      High-throughput enterprise AI inference using NVIDIA NIM microservices. Supports hosted endpoints (<code className="font-mono text-[10px]">build.nvidia.com</code>) and self-hosted local NIM containers (<code className="font-mono text-[10px]">http://localhost:8000/v1</code>).
                     </p>
-                    <div className="space-y-2">
-                      <div className="relative flex items-center gap-2">
-                        <input
-                          type={visibleKeys['nvidia'] ? 'text' : 'password'}
-                          value={form.nvidiaApiKey ?? ''}
-                          onChange={(e) => setForm((f) => ({ ...f, nvidiaApiKey: e.target.value }))}
-                          placeholder="NVIDIA API Key (nvapi-...)"
-                          className="flex-1 bg-[var(--bg-input)] border border-[var(--border-subtle)] rounded-lg pl-3 pr-8 py-1.5 text-xs font-mono text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => toggleKeyVisibility('nvidia')}
-                          className="absolute right-24 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                        >
-                          {visibleKeys['nvidia'] ? <EyeOff size={13} /> : <Eye size={13} />}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleTestConnection('nvidia', form.nvidiaApiKey)}
-                          disabled={testingProvider === 'nvidia'}
-                          className="px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] disabled:opacity-50 shrink-0"
-                        >
-                          {testingProvider === 'nvidia' ? 'Testing…' : 'Test'}
-                        </button>
+
+                    <div className="space-y-3 pt-1">
+                      {/* API Key */}
+                      <div>
+                        <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">
+                          NVIDIA API Key
+                        </label>
+                        <div className="relative flex items-center">
+                          <input
+                            type={visibleKeys['nvidia'] ? 'text' : 'password'}
+                            value={form.nvidiaApiKey ?? ''}
+                            onChange={(e) => setForm((f) => ({ ...f, nvidiaApiKey: e.target.value }))}
+                            placeholder="nvapi-..."
+                            className="w-full bg-[var(--bg-input)] border border-[var(--border-subtle)] rounded-lg pl-3 pr-8 py-1.5 text-xs font-mono text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => toggleKeyVisibility('nvidia')}
+                            className="absolute right-2.5 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                          >
+                            {visibleKeys['nvidia'] ? <EyeOff size={13} /> : <Eye size={13} />}
+                          </button>
+                        </div>
                       </div>
-                      {testResults['nvidia'] && (
+
+                      {/* Base URL */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-[11px] font-medium text-[var(--text-secondary)]">
+                            Base URL / Endpoint
+                          </label>
+                          <div className="flex items-center gap-1.5 text-[10px]">
+                            <button
+                              type="button"
+                              onClick={() => setForm((f) => ({ ...f, nvidiaBaseUrl: 'https://integrate.api.nvidia.com/v1' }))}
+                              className="text-[var(--accent)] hover:underline"
+                            >
+                              Hosted
+                            </button>
+                            <span className="text-[var(--text-muted)]">•</span>
+                            <button
+                              type="button"
+                              onClick={() => setForm((f) => ({ ...f, nvidiaBaseUrl: 'http://localhost:8000/v1' }))}
+                              className="text-[var(--accent)] hover:underline"
+                            >
+                              Local Container (:8000)
+                            </button>
+                          </div>
+                        </div>
+                        <input
+                          type="text"
+                          value={form.nvidiaBaseUrl ?? 'https://integrate.api.nvidia.com/v1'}
+                          onChange={(e) => setForm((f) => ({ ...f, nvidiaBaseUrl: e.target.value }))}
+                          placeholder="https://integrate.api.nvidia.com/v1"
+                          className="w-full bg-[var(--bg-input)] border border-[var(--border-subtle)] rounded-lg px-3 py-1.5 text-xs font-mono text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]"
+                        />
+                      </div>
+
+                      {/* Model Selector */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-[11px] font-medium text-[var(--text-secondary)]">
+                            Default NIM Model
+                          </label>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setLoadingNvidiaModels(true)
+                              try {
+                                const res = await api.ai.getNvidiaModels()
+                                if (res.models) setNvidiaModelsList(res.models.map(m => ({ id: m.id, name: m.name || m.id })))
+                              } catch {} finally {
+                                setLoadingNvidiaModels(false)
+                              }
+                            }}
+                            className="text-[10px] text-[var(--accent)] hover:underline flex items-center gap-1"
+                          >
+                            <RefreshCw size={10} className={loadingNvidiaModels ? 'animate-spin' : ''} />
+                            <span>Discover models</span>
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={form.nvidiaModel ?? 'nvidia/llama-3.1-nemotron-70b-instruct'}
+                            onChange={(e) => setForm((f) => ({ ...f, nvidiaModel: e.target.value }))}
+                            className="flex-1 bg-[var(--bg-input)] border border-[var(--border-subtle)] rounded-lg px-3 py-1.5 text-xs font-mono text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)]"
+                          >
+                            <option value="nvidia/llama-3.1-nemotron-70b-instruct">nvidia/llama-3.1-nemotron-70b-instruct (Recommended)</option>
+                            <option value="mistralai/codestral-22b-instruct-v0.1">mistralai/codestral-22b-instruct-v0.1 (Coding)</option>
+                            <option value="deepseek-ai/deepseek-r1">deepseek-ai/deepseek-r1 (Reasoning)</option>
+                            <option value="qwen/qwen2.5-coder-32b-instruct">qwen/qwen2.5-coder-32b-instruct (Qwen Coder)</option>
+                            <option value="meta/codellama-70b">meta/codellama-70b</option>
+                            {nvidiaModelsList
+                              .filter(m => !['nvidia/llama-3.1-nemotron-70b-instruct', 'mistralai/codestral-22b-instruct-v0.1', 'deepseek-ai/deepseek-r1', 'qwen/qwen2.5-coder-32b-instruct', 'meta/codellama-70b'].includes(m.id))
+                              .map(m => (
+                                <option key={m.id} value={m.id}>{m.id}</option>
+                              ))}
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => handleTestConnection('nvidia', form.nvidiaApiKey, form.nvidiaBaseUrl, form.nvidiaModel)}
+                            disabled={testingProvider === 'nvidia'}
+                            className="px-4 py-1.5 text-xs font-medium rounded-lg bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] disabled:opacity-50 shrink-0 flex items-center gap-1.5 shadow-xs"
+                          >
+                            {testingProvider === 'nvidia' ? <RefreshCw size={12} className="animate-spin" /> : <Zap size={12} />}
+                            <span>Test NIM</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Diagnostic Results */}
+                      {nvidiaDiagnostics && (
+                        <div className="p-3.5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] space-y-2.5 text-xs">
+                          <div className="flex items-center justify-between pb-2 border-b border-[var(--border-subtle)]">
+                            <span className="font-semibold text-[var(--text-primary)]">
+                              Diagnostic Results ({nvidiaDiagnostics.latencyMs}ms)
+                            </span>
+                            <span className={cn(
+                              'px-2 py-0.5 rounded-full text-[10px] font-bold uppercase',
+                              nvidiaDiagnostics.status === 'available' ? 'bg-emerald-500/20 text-emerald-400' :
+                              nvidiaDiagnostics.status === 'degraded' ? 'bg-amber-500/20 text-amber-400' :
+                              'bg-red-500/20 text-red-400'
+                            )}>
+                              {nvidiaDiagnostics.status}
+                            </span>
+                          </div>
+
+                          <div className="space-y-2">
+                            {nvidiaDiagnostics.steps.map((st, idx) => (
+                              <div key={idx} className="flex items-start gap-2 text-[11px]">
+                                <div className="mt-0.5">
+                                  {st.status === 'pass' ? (
+                                    <CheckCircle2 size={13} className="text-emerald-400 shrink-0" />
+                                  ) : st.status === 'skipped' ? (
+                                    <span className="text-[10px] text-[var(--text-muted)] shrink-0">⏸</span>
+                                  ) : (
+                                    <AlertCircle size={13} className="text-red-400 shrink-0" />
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between">
+                                    <span className={st.status === 'pass' ? 'text-[var(--text-primary)] font-medium' : 'text-red-400 font-medium'}>
+                                      {st.name}
+                                    </span>
+                                    {st.latencyMs !== undefined && (
+                                      <span className="text-[10px] font-mono text-[var(--text-muted)]">
+                                        {st.latencyMs}ms
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[10px] text-[var(--text-secondary)] mt-0.5 leading-relaxed">
+                                    {st.message}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+                          {nvidiaDiagnostics.suggestedAction && (
+                            <div className="mt-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 leading-relaxed">
+                              💡 <b>Actionable Solution:</b> {nvidiaDiagnostics.suggestedAction}
+                            </div>
+                          )}
+
+                          {nvidiaDiagnostics.technicalError && (
+                            <div className="text-[10px] font-mono text-red-400/90 bg-black/20 p-2 rounded truncate">
+                              Error: {nvidiaDiagnostics.technicalError}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {testResults['nvidia'] && !nvidiaDiagnostics && (
                         <TestResultBanner result={testResults['nvidia']} />
                       )}
                     </div>
@@ -714,8 +875,8 @@ export function SettingsPanel() {
             </button>
           </div>
         </div>
-      </div>
-    </div>
+      </>
+    </Modal>
   )
 }
 

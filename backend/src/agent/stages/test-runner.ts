@@ -28,6 +28,13 @@ export class TestRunner {
       return;
     }
     
+    const fullCommand = `${command} ${args.join(' ')}`.trim();
+    if (sandbox.requiresApproval(fullCommand) && !(await ctx.confirm('dangerous_command', `Run: ${fullCommand}`, { command: fullCommand }))) {
+      ctx.testResults = { passed: false, output: '', error: 'Test command was not approved.' };
+      ctx.emit({ type: 'TESTING_COMPLETE', taskId: ctx.taskId, data: { result: ctx.testResults } });
+      return;
+    }
+
     try {
       const result = await sandbox.execute(command, args);
       ctx.testResults = {

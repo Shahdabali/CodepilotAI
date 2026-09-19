@@ -11,6 +11,15 @@ export interface CompressedContext {
   files: Array<{ path: string; content: string; compressed: boolean }>;
   totalTokens: number;
   omittedFilesCount: number;
+  targetedTokens?: ParsedTokens;
+}
+
+export interface ParsedTokens {
+  files: string[];
+  folders: string[];
+  selection?: string;
+  isProjectWide: boolean;
+  cleanedPrompt: string;
 }
 
 export class ContextManager {
@@ -29,6 +38,64 @@ export class ContextManager {
     /\.(png|jpg|jpeg|gif|ico|svg|webp|woff|woff2|ttf|eot|mp4|webm|zip|tar|gz|exe|dll|so|dylib)$/i,
   ];
 
+  /**
+   * Parse smart context tokens from prompt:
+   * e.g. @file:src/App.tsx, @file(src/App.tsx), @src/index.ts, @folder:src/ai, @selection, @project
+   */
+  static parseTokens(prompt: string): ParsedTokens {
+    const files: string[] = [];
+    const folders: string[] = [];
+    let isProjectWide = false;
+    let selection: string | undefined;
+
+    // Detect @project
+    if (/@project\b/i.test(prompt)) {
+      isProjectWide = true;
+    }
+
+    // Match explicit @file:path or @file(path) or @file "path"
+    const fileMatches = prompt.matchAll(/@file(?:[:\s]+|(?:\(([^)]+)\)))("([^"]+)"|'([^']+)'|([^\s)]+))/gi);
+    for (const match of fileMatches) {
+      const target = match[1] || match[3] || match[4] || match[5];
+      if (target && !target.startsWith('@')) {
+        files.push(target.replace(/\\/g, '/').replace(/^['"]|['"]$/g, ''));
+      }
+    }
+
+    // Match shorthand @path/to/file.ext
+    const directPathMatches = prompt.matchAll(/@([a-zA-Z0-9_\-\.\/]+\.[a-zA-Z0-9]+)/g);
+    for (const match of directPathMatches) {
+      const p = match[1];
+      if (p && !files.includes(p) && !p.startsWith('file:') && !p.startsWith('folder:')) {
+        files.push(p.replace(/\\/g, '/'));
+      }
+    }
+
+    // Match @folder:path or @folder(path)
+    const folderMatches = prompt.matchAll(/@folder(?:[:\s]+|(?:\(([^)]+)\)))("([^"]+)"|'([^']+)'|([^\s)]+))/gi);
+    for (const match of folderMatches) {
+      const target = match[1] || match[3] || match[4] || match[5];
+      if (target) {
+        folders.push(target.replace(/\\/g, '/').replace(/^['"]|['"]$/g, ''));
+      }
+    }
+
+    // Cleaned prompt without special directives
+    const cleanedPrompt = prompt
+      .replace(/@project\b/gi, '')
+      .replace(/@file(?:[:\s]+[^\s]+|\([^)]+\))/gi, '')
+      .replace(/@folder(?:[:\s]+[^\s]+|\([^)]+\))/gi, '')
+      .trim();
+
+    return {
+      files,
+      folders,
+      selection,
+      isProjectWide,
+      cleanedPrompt,
+    };
+  }
+
   static estimateTokens(text: string): number {
     return Math.ceil(text.length / 4);
   }
@@ -41,11 +108,37 @@ export class ContextManager {
     return true;
   }
 
-  static scoreFile(filePath: string, content: string, taskPrompt: string): number {
+  static scoreFile(
+    filePath: string,
+    content: string,
+    taskPrompt: string,
+    tokens?: ParsedTokens
+  ): number {
     let score = 10;
-    const lowerPath = filePath.toLowerCase();
-    const lowerPrompt = taskPrompt.toLowerCase();
+    const normalizedPath = filePath.replace(/\\/g, '/').toLowerCase();
     const baseName = path.basename(filePath).toLowerCase();
+
+    // If explicit @file match
+    if (tokens?.files) {
+      for (const targetFile of tokens.files) {
+        const normTarget = targetFile.toLowerCase();
+        if (normalizedPath === normTarget || normalizedPath.endsWith('/' + normTarget) || baseName === normTarget) {
+          return 10000; // Guaranteed top priority
+        }
+      }
+    }
+
+    // If inside explicit @folder match
+    if (tokens?.folders) {
+      for (const targetFolder of tokens.folders) {
+        const normFolder = targetFolder.toLowerCase();
+        if (normalizedPath.includes('/' + normFolder + '/') || normalizedPath.startsWith(normFolder + '/')) {
+          score += 500;
+        }
+      }
+    }
+
+    const lowerPrompt = taskPrompt.toLowerCase();
 
     // High relevance if explicit filename or path in prompt
     if (lowerPrompt.includes(baseName)) {
@@ -90,14 +183,16 @@ export class ContextManager {
     taskPrompt: string,
     maxTokens: number = 30000
   ): CompressedContext {
+    const tokens = this.parseTokens(taskPrompt);
+
     // 1. Filter out ignored files
     const relevant = files.filter(f => this.isRelevantFile(f.path));
 
     // 2. Score each file
     const scoredFiles: ContextFile[] = relevant.map(f => {
-      const tokens = this.estimateTokens(f.content);
-      const score = this.scoreFile(f.path, f.content, taskPrompt);
-      return { path: f.path, content: f.content, score, tokens };
+      const fileTokens = this.estimateTokens(f.content);
+      const score = this.scoreFile(f.path, f.content, taskPrompt, tokens);
+      return { path: f.path, content: f.content, score, tokens: fileTokens };
     });
 
     // 3. Sort descending by score
@@ -130,6 +225,7 @@ export class ContextManager {
       files: selected,
       totalTokens: currentTokens,
       omittedFilesCount: omittedCount,
+      targetedTokens: tokens,
     };
   }
 

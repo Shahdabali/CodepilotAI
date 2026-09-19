@@ -21,6 +21,12 @@ export class ExecutionEngine {
       return;
     }
     
+    const fullCommand = `${command} ${args.join(' ')}`.trim();
+    if (sandbox.requiresApproval(fullCommand) && !(await ctx.confirm('dangerous_command', `Run: ${fullCommand}`, { command: fullCommand }))) {
+      ctx.emit({ type: 'RUNNING_COMPLETE', taskId: ctx.taskId, data: { message: 'Skipped execution (not approved)' } });
+      return;
+    }
+
     try {
       const result = await sandbox.execute(command, args);
       ctx.emit({ type: 'RUNNING_COMPLETE', taskId: ctx.taskId, data: { result } });

@@ -2,7 +2,7 @@ export type AutonomyLevel = 'SAFE' | 'BALANCED' | 'AUTONOMOUS';
 export type AgentMode = 'BUILD'|'FIX'|'OPTIMIZE'|'EXPLAIN'|'TEST'|'REFACTOR'|'REVIEW'|'MIGRATE'|'AUTONOMOUS';
 export type TaskStatus = 'PENDING'|'RUNNING'|'COMPLETED'|'FAILED'|'CANCELLED';
 export type AgentStage = 'UNDERSTANDING'|'PLANNING'|'INSPECTING'|'IMPLEMENTING'|'RUNNING'|'TESTING'|'DEBUGGING'|'OPTIMIZING'|'VERIFYING'|'COMPLETE'|'FAILED';
-export type AgentEventType = 'stage_change'|'log'|'file_change'|'command_run'|'command_output'|'test_result'|'error'|'approval_required'|'complete'|'iteration'|'optimization'|'heartbeat';
+export type AgentEventType = 'stage_change'|'log'|'file_change'|'command_run'|'command_output'|'test_result'|'error'|'approval_required'|'approval_resolved'|'cancelled'|'complete'|'iteration'|'optimization'|'heartbeat';
 
 export interface AgentEvent {
   type: AgentEventType;
@@ -28,6 +28,8 @@ export interface Task {
   id: string; projectId: string; command: string; mode: AgentMode;
   status: TaskStatus; currentStage: AgentStage | null; iterationCount: number;
   createdAt: string; completedAt: string | null; summary: string | null; filesChanged: string[];
+  /** How much the agent may do without asking, as chosen when the task started. */
+  autonomy?: AutonomyLevel | null;
 }
 export interface TaskStep {
   id: string; taskId: string; stage: AgentStage;
@@ -108,6 +110,51 @@ export interface ProvidersResponse {
   };
 }
 
+export interface ProjectAnalysis {
+  language: string;
+  framework: string | null;
+  packageManager: string | null;
+  testFramework: string | null;
+  buildTool?: string | null;
+  fileCount: number;
+  sourceFileCount?: number;
+  testFileCount: number;
+  dependencies?: string[];
+  devDependencies?: string[];
+  hasTypeScript?: boolean;
+  hasTailwind?: boolean;
+  hasDocker?: boolean;
+  hasGit?: boolean;
+  entryPoint?: string | null;
+  scripts?: Record<string, string>;
+  description?: string | null;
+  gitStatus?: GitStatus | null;
+  configFiles?: string[];
+}
+
+export interface PathValidationResult {
+  valid: boolean;
+  exists: boolean;
+  isDirectory: boolean;
+  error?: string;
+  absolutePath: string;
+  name: string;
+}
+
+export interface NvidiaDiagnosticStep {
+  name: string;
+  status: 'pass' | 'fail' | 'skipped';
+  message: string;
+  latencyMs?: number;
+}
+
+export interface NvidiaDetailedHealth extends HealthStatus {
+  steps: NvidiaDiagnosticStep[];
+  discoveredModels: string[];
+  suggestedAction?: string;
+  technicalError?: string;
+}
+
 export interface AppSettings {
   autonomyLevel: AutonomyLevel;
   geminiApiKey: string;
@@ -115,6 +162,8 @@ export interface AppSettings {
   groqApiKey?: string;
   openRouterApiKey?: string;
   nvidiaApiKey?: string;
+  nvidiaBaseUrl?: string;
+  nvidiaModel?: string;
   githubApiKey?: string;
   ollamaEnabled?: boolean | string;
   ollamaBaseUrl?: string;

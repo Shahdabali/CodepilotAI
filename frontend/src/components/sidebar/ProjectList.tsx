@@ -26,8 +26,8 @@ export function ProjectList() {
     setAdding(true)
     setError(null)
     try {
-      const project = await api.projects.create(newPath.trim())
-      addProject(project)
+      const res = await api.projects.create(newPath.trim())
+      addProject(res.project)
       setNewPath('')
       setShowAdd(false)
     } catch (e: any) {

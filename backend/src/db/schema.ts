@@ -19,7 +19,15 @@ export async function initDb(): Promise<Client> {
   const dbPath = path.resolve(config.dbPath)
   _db = createClient({ url: `file:${dbPath}` })
   await runMigrations(_db)
+  await addColumnIfMissing(_db, 'tasks', 'autonomy', 'TEXT')
   return _db
+}
+
+/** SQLite has no "ADD COLUMN IF NOT EXISTS"; a duplicate-column error just means the migration already ran. */
+async function addColumnIfMissing(db: Client, table: string, column: string, type: string): Promise<void> {
+  const info = await db.execute(`PRAGMA table_info(${table})`)
+  if (info.rows.some((r) => r.name === column)) return
+  await db.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`)
 }
 
 async function runMigrations(db: Client): Promise<void> {

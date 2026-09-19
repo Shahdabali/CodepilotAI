@@ -25,8 +25,8 @@ export default function Welcome() {
     setLoading(true)
     setError(null)
     try {
-      const project = await api.projects.create(path.trim())
-      addProject(project)
+      const res = await api.projects.create(path.trim())
+      addProject(res.project)
     } catch (err: any) {
       setError(err.message || 'Failed to open project')
     } finally {

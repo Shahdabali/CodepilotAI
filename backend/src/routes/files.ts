@@ -38,4 +38,17 @@ export const filesPlugin: FastifyPluginAsync = async (fastify) => {
     await fm.writeFile(path, content);
     return { success: true };
   });
+
+  fastify.delete('/api/projects/:id/files', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { path: filePath } = request.query as { path: string };
+    if (!filePath) return reply.status(400).send({ error: 'path is required' });
+
+    const project = await queries.getProject(id);
+    if (!project) return reply.status(404).send({ error: 'Project not found' });
+
+    const fm = new FileManager(project.path, 'api');
+    await fm.deleteFile(filePath);
+    return { success: true };
+  });
 };

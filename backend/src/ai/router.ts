@@ -57,7 +57,7 @@ export class AIRouter {
     this.geminiProvider = new GeminiProvider(config.geminiApiKey, config.geminiModel);
     this.groqProvider = new GroqProvider(config.groqApiKey);
     this.openRouterProvider = new OpenRouterProvider(config.openRouterApiKey);
-    this.nvidiaProvider = new NvidiaProvider(config.nvidiaApiKey);
+    this.nvidiaProvider = new NvidiaProvider(config.nvidiaApiKey, config.nvidiaBaseUrl, config.nvidiaModel);
     this.githubProvider = new GithubModelsProvider(config.githubApiKey);
     this.ollamaProvider = new OllamaProvider(config.ollamaBaseUrl);
 
@@ -117,8 +117,14 @@ export class AIRouter {
       const openRouterKey = (settings['openRouterApiKey'] as string) || config.openRouterApiKey;
       if (openRouterKey) (this.openRouterProvider as any).setApiKey(openRouterKey);
 
-      const nvidiaKey = (settings['nvidiaApiKey'] as string) || config.nvidiaApiKey;
-      if (nvidiaKey) (this.nvidiaProvider as any).setApiKey(nvidiaKey);
+      const nvidiaKey = (settings['nvidiaApiKey'] as string) || (settings['nvidiaNimApiKey'] as string) || config.nvidiaApiKey;
+      if (nvidiaKey) this.nvidiaProvider.setApiKey(nvidiaKey);
+
+      const nvidiaBaseUrl = (settings['nvidiaBaseUrl'] as string) || (settings['nvidiaNimBaseUrl'] as string) || config.nvidiaBaseUrl;
+      if (nvidiaBaseUrl) this.nvidiaProvider.setBaseURL(nvidiaBaseUrl);
+
+      const nvidiaModel = (settings['nvidiaModel'] as string) || (settings['nvidiaNimModel'] as string) || config.nvidiaModel;
+      if (nvidiaModel) this.nvidiaProvider.setModel(nvidiaModel);
 
       const githubKey = (settings['githubApiKey'] as string) || config.githubApiKey;
       if (githubKey) (this.githubProvider as any).setApiKey(githubKey);
@@ -154,7 +160,20 @@ export class AIRouter {
       return Boolean(cd && cd.cooldownUntil > now);
     };
 
-    // If explicit routing mode is chosen (not 'auto')
+    // Strict routing modes (e.g. 'nvidia-only', 'strict:nvidia', 'gemini-only')
+    // Does NOT silently fall back to other providers.
+    if (this.routingMode.endsWith('-only') || this.routingMode.startsWith('strict:')) {
+      const targetId = this.routingMode.replace('-only', '').replace('strict:', '');
+      const explicit = this.providers.get(targetId);
+      if (!explicit || !explicit.isConfigured()) {
+        throw new Error(
+          `Strict routing mode '${this.routingMode}' is active, but provider '${targetId}' is not configured or ready.`
+        );
+      }
+      return [{ provider: explicit, modelId: (explicit as any).getModel?.() }];
+    }
+
+    // If explicit preferred routing mode is chosen (with fallback to other providers)
     if (this.routingMode !== 'auto') {
       const explicit = this.providers.get(this.routingMode);
       if (explicit && explicit.isConfigured()) {

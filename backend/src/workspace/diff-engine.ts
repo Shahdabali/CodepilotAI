@@ -4,6 +4,10 @@ import { FileSnapshot } from '../types/shared.js';
 export interface FileDiff {
   filePath: string;
   patch: string;
+  /** Same text as `patch` — the UI reads it under this name. */
+  diff: string;
+  before: string | null;
+  after: string | null;
   additions: number;
   deletions: number;
   isNew: boolean;
@@ -28,6 +32,9 @@ export function generateDiff(before: string | null, after: string | null, filePa
   return {
     filePath,
     patch,
+    diff: patch,
+    before,
+    after,
     additions,
     deletions,
     isNew: before === null && after !== null,

@@ -22,6 +22,11 @@ export class GitService {
     this.git = simpleGit(projectPath)
   }
 
+  static async clone(repoUrl: string, targetPath: string): Promise<void> {
+    const git = simpleGit()
+    await git.clone(repoUrl, targetPath)
+  }
+
   async isRepo(): Promise<boolean> {
     try {
       return await this.git.checkIsRepo()

@@ -12,7 +12,13 @@ export class FixGenerator {
     const fileManager = new FileManager(ctx.project.path, ctx.taskId);
     
     for (const file of ctx.filesChanged) {
+      ctx.assertActive();
       if (!(await fileManager.fileExists(file))) continue;
+      if (!(await ctx.confirm('file_write', `Apply a fix to ${file}`, { filePath: file, isNew: false }))) {
+        ctx.addSkipped(file)
+        ctx.emitEvent('log', 'DEBUGGING', `Skipped fixing ${file} (not approved)`, { level: 'warn' });
+        continue;
+      }
       const content = await fileManager.readFile(file);
       
       const prompt = `File: ${file}
@@ -35,6 +41,7 @@ Fix the code. Return ONLY the fixed raw code without markdown wrappers.`;
         }
       }
       
+      ctx.assertActive();
       await fileManager.writeFile(file, cleanCode.trim());
     }
     

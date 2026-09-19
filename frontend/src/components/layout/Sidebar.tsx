@@ -1,271 +1,291 @@
 import React from 'react'
-import { useUIStore } from '@/stores/ui.store'
+import { AnimatePresence, motion } from 'framer-motion'
+import { useQuery } from '@tanstack/react-query'
+import {
+  ChevronsUpDown,
+  FolderGit2,
+  Github,
+  Home,
+  Network,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Play,
+  Settings,
+  type LucideIcon,
+} from 'lucide-react'
+import { useUIStore, type AppView } from '@/stores/ui.store'
 import { useProjectStore } from '@/stores/project.store'
 import { useTaskStore } from '@/stores/task.store'
-import {
-  Plus,
-  FolderOpen,
-  Settings,
-  HelpCircle,
-  Sun,
-  Moon,
-  ChevronLeft,
-  ChevronRight,
-  Sparkles,
-  CheckCircle2,
-  Clock,
-  AlertCircle,
-  Code2
-} from 'lucide-react'
+import { api } from '@/lib/api'
 import { cn, formatDate } from '@/lib/utils'
+import { springSnappy } from '@/lib/motion'
+import { useMedia } from '@/hooks/useMedia'
+import { BrandMark, Wordmark } from '@/components/ui/Brand'
+import { StatusGlyph } from '@/components/ui/StatusGlyph'
+import { Skeleton } from '@/components/ui/primitives'
+
+interface NavItem {
+  id: string
+  label: string
+  icon: LucideIcon
+  view: AppView
+  badge?: string
+}
 
 export function Sidebar() {
-  const {
-    theme,
-    toggleTheme,
-    sidebarCollapsed,
-    toggleSidebar,
-    setCurrentView,
-    setSettingsOpen,
-    setProjectModalOpen,
-    setShortcutsModalOpen,
-    currentView
-  } = useUIStore()
+  const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed)
+  const toggleSidebar = useUIStore((s) => s.toggleSidebar)
+  const currentView = useUIStore((s) => s.currentView)
+  const setCurrentView = useUIStore((s) => s.setCurrentView)
+  const setSettingsOpen = useUIStore((s) => s.setSettingsOpen)
+  const openProjectModalWithTab = useUIStore((s) => s.openProjectModalWithTab)
 
-  const { activeProject, projects } = useProjectStore()
-  const { tasks, activeTask, setActiveTask } = useTaskStore()
+  const activeProject = useProjectStore((s) => s.activeProject)
+  const { tasks, tasksLoaded, activeTask, setActiveTask } = useTaskStore()
 
-  const handleNewTask = () => {
-    setCurrentView('home')
-  }
+  const { data: providersData, isLoading: providersLoading } = useQuery({
+    queryKey: ['ai-providers'],
+    queryFn: api.ai.getProviders,
+    staleTime: 30000,
+  })
 
-  const handleSelectTask = (task: typeof tasks[0]) => {
-    setActiveTask(task)
-    setCurrentView('task')
-  }
+  const configured = providersData?.providers?.filter((p) => p.isConfigured) ?? []
+  const routing = providersData?.routingMode ?? 'auto'
+  const providerLabel =
+    routing === 'auto'
+      ? `Auto router · ${configured.length} provider${configured.length === 1 ? '' : 's'}`
+      : (providersData?.providers?.find((p) => p.id === routing)?.name ?? routing)
+
+  const nav: NavItem[] = [
+    { id: 'home', label: 'Home', icon: Home, view: 'home' },
+    { id: 'github', label: 'GitHub Explorer', icon: Github, view: 'github', badge: 'New' },
+    { id: 'api-fetcher', label: 'API Fetcher', icon: Network, view: 'api-fetcher' },
+    ...(activeTask ? [{ id: 'task', label: 'Current task', icon: Play, view: 'task' as AppView }] : []),
+  ]
+
+  // On phones the sidebar is always the icon rail — the full 264px would leave no room for the page.
+  const narrow = useMedia('(max-width: 767px)')
+  const collapsed = sidebarCollapsed || narrow
 
   return (
-    <aside
-      className={cn(
-        'h-screen flex flex-col border-r border-[var(--border-subtle)] bg-[var(--bg-surface)] select-none transition-all duration-200 z-30 shrink-0',
-        sidebarCollapsed ? 'w-16' : 'w-64'
-      )}
+    <motion.aside
+      initial={false}
+      animate={{ width: collapsed ? 64 : 264 }}
+      transition={springSnappy}
+      aria-label="Sidebar"
+      className="z-30 flex h-full shrink-0 select-none flex-col overflow-hidden border-r border-[var(--border-subtle)] bg-[var(--bg-surface)]"
     >
-      {/* Brand Header */}
-      <div className="h-14 flex items-center justify-between px-3 border-b border-[var(--border-subtle)]">
-        {!sidebarCollapsed ? (
+      {/* Brand + collapse */}
+      <div className={cn('flex h-12 shrink-0 items-center border-b border-[var(--border-subtle)]', collapsed ? 'justify-center' : 'justify-between pl-4 pr-2')}>
+        <button type="button" onClick={() => setCurrentView('home')} className="flex items-center gap-2.5 rounded-lg" aria-label="CodePilot AI — home">
+          <BrandMark size={26} />
+          {!collapsed && <Wordmark />}
+        </button>
+        {!collapsed && (
           <button
-            onClick={() => setCurrentView('home')}
-            className="flex items-center gap-2.5 px-1 py-1 rounded hover:opacity-80 transition-opacity text-left"
+            type="button"
+            onClick={toggleSidebar}
+            aria-label="Collapse sidebar (Ctrl+B)"
+            title="Collapse sidebar (Ctrl+B)"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
           >
-            <div className="w-7 h-7 rounded-lg bg-[var(--accent)] flex items-center justify-center text-white font-bold text-sm shadow-sm">
-              ⚡
-            </div>
-            <div className="flex flex-col">
-              <span className="font-semibold text-sm tracking-tight text-[var(--text-primary)]">
-                CodePilot <span className="text-[var(--accent)] text-xs font-bold">AI</span>
-              </span>
-            </div>
-          </button>
-        ) : (
-          <button
-            onClick={() => setCurrentView('home')}
-            className="w-full flex justify-center py-1"
-            title="CodePilot AI Home"
-          >
-            <div className="w-8 h-8 rounded-lg bg-[var(--accent)] flex items-center justify-center text-white font-bold text-sm shadow-sm">
-              ⚡
-            </div>
+            <PanelLeftClose size={16} />
           </button>
         )}
+      </div>
 
+      {collapsed && !narrow && (
         <button
+          type="button"
           onClick={toggleSidebar}
-          title={sidebarCollapsed ? 'Expand Sidebar (Ctrl+B)' : 'Collapse Sidebar (Ctrl+B)'}
-          className="w-7 h-7 flex items-center justify-center rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+          aria-label="Expand sidebar (Ctrl+B)"
+          title="Expand sidebar (Ctrl+B)"
+          className="mx-auto mt-2 flex h-8 w-8 items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
         >
-          {sidebarCollapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
+          <PanelLeftOpen size={16} />
         </button>
-      </div>
+      )}
 
-      {/* Primary Action: + New Task */}
-      <div className="p-3">
+      {/* Workspace switcher */}
+      <div className="px-3 pt-3">
         <button
-          onClick={handleNewTask}
+          type="button"
+          onClick={() => openProjectModalWithTab(activeProject ? 'recent' : 'open')}
+          title={activeProject ? `${activeProject.name} — switch project` : 'Open a project'}
+          aria-label={activeProject ? `Project ${activeProject.name}. Switch project` : 'Open a project'}
           className={cn(
-            'w-full flex items-center justify-center gap-2 py-2 rounded-lg font-medium text-sm transition-all',
-            'bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] shadow-sm active:scale-[0.98]',
-            sidebarCollapsed ? 'px-0' : 'px-3'
+            'group flex w-full items-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] text-left hover:border-[var(--border-strong)] hover:bg-[var(--bg-hover)]',
+            collapsed ? 'h-10 justify-center' : 'gap-2.5 px-2.5 py-2'
           )}
-          title="New Task (Ctrl+N)"
         >
-          <Plus size={16} strokeWidth={2.5} />
-          {!sidebarCollapsed && <span>New Task</span>}
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-subtle)] text-[var(--accent-text)]">
+            <FolderGit2 size={15} />
+          </span>
+          {!collapsed && (
+            <>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[13px] font-semibold leading-tight text-[var(--text-primary)]">
+                  {activeProject ? activeProject.name : 'No project open'}
+                </span>
+                <span className="block truncate text-[11px] leading-tight text-[var(--text-muted)]">
+                  {activeProject ? [activeProject.language, activeProject.framework].filter(Boolean).join(' · ') || 'Workspace' : 'Click to open or clone one'}
+                </span>
+              </span>
+              <ChevronsUpDown size={14} className="shrink-0 text-[var(--text-muted)] group-hover:text-[var(--text-primary)]" />
+            </>
+          )}
         </button>
       </div>
 
-      {/* Navigation Sections */}
-      <div className="flex-1 overflow-y-auto px-2 space-y-4">
-        {/* Project Section */}
-        <div>
-          {!sidebarCollapsed && (
-            <div className="flex items-center justify-between px-2 mb-1">
-              <span className="text-[11px] font-semibold tracking-wider text-[var(--text-muted)] uppercase">
-                Project
-              </span>
-              <button
-                onClick={() => setProjectModalOpen(true)}
-                className="text-xs text-[var(--accent)] hover:underline flex items-center gap-1"
-              >
-                Switch
-              </button>
-            </div>
-          )}
-
-          {activeProject ? (
+      {/* Primary navigation */}
+      <nav aria-label="Primary" className="space-y-0.5 px-3 pt-3">
+        {nav.map((item) => {
+          const active = currentView === item.view
+          const Icon = item.icon
+          return (
             <button
-              onClick={() => setProjectModalOpen(true)}
+              key={item.id}
+              type="button"
+              onClick={() => setCurrentView(item.view)}
+              aria-current={active ? 'page' : undefined}
+              title={collapsed ? item.label : undefined}
               className={cn(
-                'w-full flex items-center gap-2.5 p-2 rounded-lg text-left transition-colors',
-                'bg-[var(--bg-card)] border border-[var(--border-subtle)] hover:border-[var(--border-strong)]'
+                'relative flex h-9 w-full items-center rounded-lg text-[13px] font-medium',
+                collapsed ? 'justify-center' : 'gap-2.5 px-2.5',
+                active ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
               )}
-              title={sidebarCollapsed ? `${activeProject.name} (${activeProject.language || 'Project'})` : undefined}
             >
-              <div className="w-7 h-7 rounded bg-[var(--bg-hover)] flex items-center justify-center shrink-0 text-[var(--text-secondary)]">
-                <FolderOpen size={14} />
-              </div>
-              {!sidebarCollapsed && (
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-[var(--text-primary)] truncate">
-                    {activeProject.name}
-                  </p>
-                  <p className="text-[10px] text-[var(--text-muted)] truncate">
-                    {activeProject.language || 'Ready'}
-                  </p>
-                </div>
+              {active && (
+                <motion.span layoutId="sidebar-active" transition={springSnappy} className="absolute inset-0 rounded-lg bg-[var(--bg-card)] ring-1 ring-inset ring-[var(--border-subtle)]">
+                  <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-[var(--accent-text)]" />
+                </motion.span>
               )}
-            </button>
-          ) : (
-            <button
-              onClick={() => setProjectModalOpen(true)}
-              className="w-full flex items-center justify-center gap-2 py-2 text-xs text-[var(--text-secondary)] border border-dashed border-[var(--border-subtle)] hover:border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
-              title="Add Project"
-            >
-              <FolderOpen size={14} />
-              {!sidebarCollapsed && <span>+ Add Project</span>}
-            </button>
-          )}
-        </div>
-
-        {/* Recent Tasks Section */}
-        <div>
-          {!sidebarCollapsed && (
-            <div className="px-2 mb-1.5 flex items-center justify-between">
-              <span className="text-[11px] font-semibold tracking-wider text-[var(--text-muted)] uppercase">
-                Recent Tasks
-              </span>
-              {tasks.length > 0 && (
-                <span className="text-[10px] text-[var(--text-muted)] font-mono">
-                  {tasks.length}
+              <Icon size={16} className={cn('relative z-10 shrink-0', active ? 'text-[var(--accent-text)]' : 'text-[var(--text-muted)]')} />
+              {!collapsed && <span className="relative z-10 flex-1 truncate text-left">{item.label}</span>}
+              {!collapsed && item.badge && (
+                <span className="relative z-10 rounded bg-[var(--accent-subtle)] px-1.5 py-0.5 font-mono text-[9.5px] font-semibold uppercase tracking-wide text-[var(--accent-text)]">
+                  {item.badge}
                 </span>
               )}
-            </div>
-          )}
+            </button>
+          )
+        })}
+      </nav>
 
-          {tasks.length === 0 ? (
-            !sidebarCollapsed && (
-              <p className="text-xs text-[var(--text-muted)] px-2 py-3 text-center leading-relaxed">
-                No tasks yet. Describe what to build above!
+      {/* Recent tasks */}
+      <div className="mt-3 min-h-0 flex-1 overflow-y-auto px-3 pb-2">
+        {!collapsed && (
+          <>
+            <div className="mb-1.5 flex items-center justify-between px-1">
+              <span className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Recent tasks</span>
+              {tasks.length > 0 && <span className="font-mono text-[10.5px] text-[var(--text-muted)]">{tasks.length}</span>}
+            </div>
+
+            {activeProject && !tasksLoaded ? (
+              <div className="space-y-1.5 px-1" aria-busy>
+                {[0, 1, 2].map((i) => (
+                  <Skeleton key={i} className="h-9" style={{ opacity: 1 - i * 0.25 }} />
+                ))}
+              </div>
+            ) : tasks.length === 0 ? (
+              <p className="px-1 text-xs leading-relaxed text-[var(--text-muted)]">
+                {activeProject ? 'Nothing yet — describe a task on the Command screen.' : 'Open a project to see its tasks.'}
               </p>
-            )
-          ) : (
-            <div className="space-y-0.5">
-              {tasks.slice(0, 10).map((task) => {
-                const isSelected = activeTask?.id === task.id && currentView === 'task'
-                const isRunning = task.status === 'RUNNING' || task.status === 'PENDING'
-                const isComplete = task.status === 'COMPLETED'
-                const isFailed = task.status === 'FAILED'
-
-                return (
-                  <button
-                    key={task.id}
-                    onClick={() => handleSelectTask(task)}
-                    className={cn(
-                      'w-full flex items-center gap-2.5 px-2 py-2 rounded-md text-left text-xs transition-colors',
-                      isSelected
-                        ? 'bg-[var(--accent-subtle)] text-[var(--accent)] font-medium'
-                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
-                    )}
-                    title={task.command}
-                  >
-                    <div className="shrink-0">
-                      {isRunning && (
-                        <div className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse" />
-                      )}
-                      {isComplete && (
-                        <CheckCircle2 size={13} className="text-[var(--success)]" />
-                      )}
-                      {isFailed && (
-                        <AlertCircle size={13} className="text-[var(--danger)]" />
-                      )}
-                      {!isRunning && !isComplete && !isFailed && (
-                        <Clock size={13} className="text-[var(--text-muted)]" />
-                      )}
-                    </div>
-                    {!sidebarCollapsed && (
-                      <div className="flex-1 min-w-0">
-                        <p className="truncate text-xs leading-snug">{task.command}</p>
-                        <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
-                          {formatDate(task.createdAt)}
-                        </p>
-                      </div>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-          )}
-        </div>
+            ) : (
+              <ul className="space-y-0.5">
+                <AnimatePresence initial={false}>
+                  {tasks.slice(0, 10).map((task) => {
+                    const selected = activeTask?.id === task.id && currentView === 'task'
+                    return (
+                      <motion.li
+                        key={task.id}
+                        layout
+                        initial={{ opacity: 0, x: -8 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={springSnappy}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveTask(task)
+                            setCurrentView('task')
+                          }}
+                          title={task.command}
+                          aria-current={selected ? 'true' : undefined}
+                          className={cn(
+                            'flex w-full items-start gap-2.5 rounded-lg px-2 py-1.5 text-left',
+                            selected ? 'bg-[var(--accent-subtle)]' : 'hover:bg-[var(--bg-hover)]'
+                          )}
+                        >
+                          <StatusGlyph status={task.status} size={14} className="mt-0.5" />
+                          <span className="min-w-0 flex-1">
+                            <span className={cn('block truncate text-xs leading-snug', selected ? 'font-medium text-[var(--accent-text)]' : 'text-[var(--text-primary)]')}>
+                              {task.command}
+                            </span>
+                            <span className="block text-[10.5px] leading-tight text-[var(--text-muted)]">
+                              {task.mode.toLowerCase()} · {formatDate(task.createdAt)}
+                            </span>
+                          </span>
+                        </button>
+                      </motion.li>
+                    )
+                  })}
+                </AnimatePresence>
+              </ul>
+            )}
+          </>
+        )}
       </div>
 
-      {/* Footer Utility Section */}
-      <div className="p-2 border-t border-[var(--border-subtle)] space-y-0.5">
+      {/* Footer: honest AI status + settings */}
+      <div className="space-y-1 border-t border-[var(--border-subtle)] p-3">
         <button
+          type="button"
           onClick={() => setSettingsOpen(true)}
+          title={collapsed ? (configured.length ? providerLabel : 'No AI provider configured — open Settings') : undefined}
           className={cn(
-            'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors',
-            sidebarCollapsed && 'justify-center px-0'
+            'flex w-full items-center rounded-lg text-left hover:bg-[var(--bg-hover)]',
+            collapsed ? 'h-9 justify-center' : 'gap-2.5 px-2 py-1.5'
           )}
-          title="Settings (Ctrl+,)"
         >
-          <Settings size={15} />
-          {!sidebarCollapsed && <span>Settings</span>}
+          <span
+            className={cn(
+              'h-2 w-2 shrink-0 rounded-full',
+              providersLoading ? 'bg-[var(--text-muted)]' : configured.length ? 'bg-[var(--success)]' : 'bg-[var(--warning)]'
+            )}
+            aria-hidden
+          />
+          {!collapsed && (
+            <span className="min-w-0 flex-1">
+              <span className="block text-xs font-medium leading-tight text-[var(--text-primary)]">
+                {providersLoading ? 'Checking AI…' : configured.length ? 'AI ready' : 'No AI provider'}
+              </span>
+              <span className="block truncate text-[10.5px] leading-tight text-[var(--text-muted)]">
+                {providersLoading ? ' ' : configured.length ? providerLabel : 'Add an API key in Settings'}
+              </span>
+            </span>
+          )}
         </button>
-
         <button
-          onClick={() => setShortcutsModalOpen(true)}
+          type="button"
+          onClick={() => setSettingsOpen(true)}
+          aria-label="Settings"
+          title={collapsed ? 'Settings (Ctrl+,)' : undefined}
           className={cn(
-            'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors',
-            sidebarCollapsed && 'justify-center px-0'
+            'flex w-full items-center rounded-lg text-[13px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]',
+            collapsed ? 'h-9 justify-center' : 'gap-2.5 px-2 py-1.5'
           )}
-          title="Keyboard Shortcuts"
         >
-          <HelpCircle size={15} />
-          {!sidebarCollapsed && <span>Help & Shortcuts</span>}
-        </button>
-
-        <button
-          onClick={toggleTheme}
-          className={cn(
-            'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors',
-            sidebarCollapsed && 'justify-center px-0'
+          <Settings size={16} className="shrink-0 text-[var(--text-muted)]" />
+          {!collapsed && (
+            <>
+              <span className="flex-1 text-left">Settings</span>
+              <kbd className="font-mono text-[10px] text-[var(--text-muted)]">Ctrl ,</kbd>
+            </>
           )}
-          title={theme === 'dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
-        >
-          {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
-          {!sidebarCollapsed && <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>}
         </button>
       </div>
-    </aside>
+    </motion.aside>
   )
 }

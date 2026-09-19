@@ -7,6 +7,7 @@ import type {
   ApprovalRequest,
   AgentStage,
   AgentMode,
+  AutonomyLevel,
   TaskStatus,
 } from '../types/shared.js'
 
@@ -113,13 +114,14 @@ export async function createTask(data: {
   projectId: string
   command: string
   mode: AgentMode
+  autonomy?: AutonomyLevel
 }): Promise<Task> {
   const db = getDb()
   const id = newId()
   const ts = now()
   await db.execute({
-    sql: `INSERT INTO tasks (id, project_id, command, mode, status, created_at) VALUES (?, ?, ?, ?, 'PENDING', ?)`,
-    args: [id, data.projectId, data.command, data.mode, ts],
+    sql: `INSERT INTO tasks (id, project_id, command, mode, status, created_at, autonomy) VALUES (?, ?, ?, ?, 'PENDING', ?, ?)`,
+    args: [id, data.projectId, data.command, data.mode, ts, data.autonomy ?? null],
   })
   return {
     id,
@@ -133,6 +135,7 @@ export async function createTask(data: {
     completedAt: null,
     summary: null,
     filesChanged: [],
+    autonomy: data.autonomy ?? null,
   }
 }
 
@@ -187,6 +190,7 @@ function rowToTask(row: Record<string, unknown>): Task {
     completedAt: row.completed_at as string | null,
     summary: row.summary as string | null,
     filesChanged: JSON.parse((row.files_changed as string) || '[]'),
+    autonomy: (row.autonomy as AutonomyLevel | null) ?? null,
   }
 }
 
@@ -305,4 +309,17 @@ export async function resolveApprovalRequest(id: string, approved: boolean): Pro
     sql: `UPDATE approval_requests SET status=?, resolved_at=? WHERE id=?`,
     args: [approved ? 'approved' : 'rejected', now(), id],
   })
+}
+
+// ─── Recovery ─────────────────────────────────────────────────────────────────
+
+/** Tasks left RUNNING/PENDING by a server restart can never finish — mark them failed so the UI stops spinning. */
+export async function failOrphanedTasks(): Promise<number> {
+  const db = getDb()
+  const result = await db.execute({
+    sql: `UPDATE tasks SET status='FAILED', current_stage='FAILED', completed_at=?, summary=COALESCE(summary, 'Interrupted — the server restarted while this task was running.')
+          WHERE status IN ('RUNNING','PENDING')`,
+    args: [now()],
+  })
+  return result.rowsAffected
 }

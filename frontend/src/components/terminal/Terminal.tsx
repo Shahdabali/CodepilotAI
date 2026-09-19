@@ -9,6 +9,65 @@ import { useUIStore } from '@/stores/ui.store'
 
 const SESSION_COUNTER = { n: 0 }
 
+const DARK_THEME = {
+  background: '#0e1115',
+  foreground: '#e8ebef',
+  cursor: '#4cc9b6',
+  selectionBackground: '#4cc9b638',
+  black: '#0e1115',
+  red: '#f0686a',
+  green: '#3ccb8f',
+  yellow: '#e6ac3a',
+  blue: '#6db8e3',
+  magenta: '#c9a2e8',
+  cyan: '#4cc9b6',
+  white: '#a6b0bc',
+  brightBlack: '#5b6572',
+  brightRed: '#ff8b8d',
+  brightGreen: '#63dba8',
+  brightYellow: '#f0c05f',
+  brightBlue: '#8ccbee',
+  brightMagenta: '#dcbaf2',
+  brightCyan: '#7ddccd',
+  brightWhite: '#f4f6f8',
+}
+
+const LIGHT_THEME = {
+  background: '#ffffff',
+  foreground: '#1b1f24',
+  cursor: '#0f766e',
+  selectionBackground: '#0f766e33',
+  black: '#1b1f24',
+  red: '#b91c1c',
+  green: '#15803d',
+  yellow: '#a16207',
+  blue: '#1f6fa5',
+  magenta: '#7e3fa3',
+  cyan: '#0f766e',
+  white: '#626b77',
+  brightBlack: '#464e58',
+  brightRed: '#dc2626',
+  brightGreen: '#16a34a',
+  brightYellow: '#ca8a04',
+  brightBlue: '#2563eb',
+  brightMagenta: '#9333ea',
+  brightCyan: '#0d9488',
+  brightWhite: '#8a939f',
+}
+
+/**
+ * xterm throws ("reading 'dimensions'") if it is fitted before it has been laid out or after it was disposed —
+ * both happen while a lazy tab is animating in. Only fit a mounted, non-empty terminal, and never let it throw.
+ */
+function safeFit(fit: FitAddon | null, host: HTMLElement | null) {
+  if (!fit || !host || host.clientWidth === 0 || host.clientHeight === 0) return
+  try {
+    fit.fit()
+  } catch {
+    /* not laid out yet — the ResizeObserver will fit again once it is */
+  }
+}
+
 export function Terminal() {
   const termRef = useRef<HTMLDivElement>(null)
   const xtermRef = useRef<XTerm | null>(null)
@@ -29,35 +88,7 @@ export function Terminal() {
       fontFamily: "'JetBrains Mono', 'Fira Code', 'Courier New', monospace",
       fontSize: 13,
       lineHeight: 1.4,
-      theme: isDark
-        ? {
-            background: '#0d1117',
-            foreground: '#f0f6fc',
-            cursor: '#2f81f7',
-            selectionBackground: '#2f81f740',
-            black: '#0d1117',
-            red: '#f85149',
-            green: '#3fb950',
-            yellow: '#d29922',
-            blue: '#2f81f7',
-            magenta: '#bc8cff',
-            cyan: '#39c5cf',
-            white: '#8b949e',
-            brightBlack: '#484f58',
-            brightRed: '#ff7b72',
-            brightGreen: '#56d364',
-            brightYellow: '#e3b341',
-            brightBlue: '#79c0ff',
-            brightMagenta: '#d2a8ff',
-            brightCyan: '#56d4dd',
-            brightWhite: '#f0f6fc',
-          }
-        : {
-            background: '#ffffff',
-            foreground: '#111827',
-            cursor: '#3b82f6',
-            selectionBackground: '#3b82f640',
-          },
+      theme: isDark ? DARK_THEME : LIGHT_THEME,
       cursorBlink: true,
       scrollback: 5000,
     })
@@ -67,7 +98,8 @@ export function Terminal() {
     term.loadAddon(fitAddon)
     term.loadAddon(linksAddon)
     term.open(termRef.current)
-    fitAddon.fit()
+    // Fit once the browser has laid the container out (not synchronously, when it may still be 0×0).
+    requestAnimationFrame(() => safeFit(fitAddon, termRef.current))
 
     xtermRef.current = term
     fitRef.current = fitAddon
@@ -117,12 +149,16 @@ export function Terminal() {
   // Resize observer
   useEffect(() => {
     if (!termRef.current || !fitRef.current) return
-    const observer = new ResizeObserver(() => {
-      try { fitRef.current?.fit() } catch { /* ignore */ }
-    })
-    observer.observe(termRef.current)
+    const host = termRef.current
+    const observer = new ResizeObserver(() => safeFit(fitRef.current, host))
+    observer.observe(host)
     return () => observer.disconnect()
   }, [])
+
+  // Follow the app's light/dark switch instead of keeping the colours the terminal was created with.
+  useEffect(() => {
+    if (xtermRef.current) xtermRef.current.options.theme = isDark ? DARK_THEME : LIGHT_THEME
+  }, [isDark])
 
   function handleReconnect() {
     if (!xtermRef.current || !activeProject) return
@@ -132,16 +168,18 @@ export function Terminal() {
   }
 
   return (
-    <div className="flex flex-col h-full bg-[var(--bg-primary)]">
+    <div className="flex flex-col h-full bg-[var(--bg-input)]">
       {/* Terminal header */}
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-[var(--border-color)] bg-[var(--bg-secondary)] shrink-0">
         <div className="flex items-center gap-2">
-          <span className="text-sm">💻</span>
           <span className="text-xs font-medium text-[var(--text-secondary)]">Terminal</span>
           <span
-            className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-green-400' : 'bg-[var(--text-muted)]'}`}
+            className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-[var(--success)]' : 'bg-[var(--text-muted)]'}`}
+            role="img"
+            aria-label={connected ? 'Connected' : 'Disconnected'}
             title={connected ? 'Connected' : 'Disconnected'}
           />
+          <span className="text-[11px] text-[var(--text-muted)]">{connected ? 'connected' : 'not connected'}</span>
         </div>
         <button
           onClick={handleReconnect}

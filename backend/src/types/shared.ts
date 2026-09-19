@@ -38,6 +38,8 @@ export type AgentEventType =
   | 'test_result'
   | 'error'
   | 'approval_required'
+  | 'approval_resolved'
+  | 'cancelled'
   | 'complete'
   | 'iteration'
   | 'optimization'
@@ -115,6 +117,8 @@ export interface Task {
   completedAt: string | null
   summary: string | null
   filesChanged: string[]
+  /** How much the agent may do without asking, as chosen when the task was started. */
+  autonomy: AutonomyLevel | null
 }
 
 export interface TaskStep {
@@ -228,6 +232,8 @@ export interface ProjectAnalysis {
   entryPoint?: string | null
   scripts?: Record<string, string>
   description?: string | null
+  gitStatus?: GitStatus | null
+  configFiles?: string[]
 }
 
 export interface OptimizationSuggestion {

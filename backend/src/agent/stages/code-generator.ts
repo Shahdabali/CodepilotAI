@@ -13,8 +13,23 @@ export class CodeGenerator {
     const allFiles = [...(ctx.plan.filesToCreate || []), ...(ctx.plan.filesToModify || [])];
     
     for (const filePath of allFiles) {
+      ctx.assertActive();
+
+      // SAFE autonomy: the user approves every write before any tokens are spent on it.
+      const isNew = !(await fileManager.fileExists(filePath));
+      const allowed = await ctx.confirm(
+        'file_write',
+        `${isNew ? 'Create' : 'Modify'} ${filePath}`,
+        { filePath, isNew }
+      );
+      if (!allowed) {
+        ctx.addSkipped(filePath);
+        ctx.emitEvent('log', 'IMPLEMENTING', `Skipped ${filePath} (not approved)`, { level: 'warn' });
+        continue;
+      }
+
       ctx.emit({ type: 'IMPLEMENTING_FILE', taskId: ctx.taskId, data: { file: filePath } });
-      
+
       let existingContent = '';
       if (await fileManager.fileExists(filePath)) {
         existingContent = await fileManager.readFile(filePath);
@@ -44,6 +59,7 @@ Write the complete updated content for this file. Return ONLY the code.`;
         }
       }
       
+      ctx.assertActive();
       await fileManager.writeFile(filePath, cleanCode.trim());
       ctx.addFileChanged(filePath);
     }

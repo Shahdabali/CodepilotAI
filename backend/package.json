@@ -9,7 +9,10 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
-    "test": "tsx src/ai/__tests__/ai-router.test.ts"
+    "test": "tsx src/ai/__tests__/ai-router.test.ts",
+    "test:fetcher": "tsx src/api-fetcher/__tests__/api-fetcher.test.ts",
+    "test:agent": "tsx src/agent/__tests__/agent-flow.test.ts",
+    "test:github": "tsx src/github/__tests__/github.test.ts"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.2",

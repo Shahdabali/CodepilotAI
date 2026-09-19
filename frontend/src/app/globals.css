@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import '../components/ui/prose.css';
 
 @theme {
   --color-bg-app: var(--bg-app);
@@ -17,32 +18,60 @@
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
-  --font-mono: 'JetBrains Mono', monospace;
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
+  --font-sans: 'IBM Plex Sans', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   Design tokens
+   Graphite surfaces, one teal accent (shared with the API Fetcher's --af-* palette).
+   Variable names are unchanged so every component keeps working; only the values moved.
+   ───────────────────────────────────────────────────────────────────────────── */
 :root {
-  /* Light Mode Surface Palette */
-  --bg-app: #f8fafc;
+  /* Light — warm paper */
+  --bg-app: #f4f3ef;
   --bg-surface: #ffffff;
-  --bg-card: #f1f5f9;
+  --bg-card: #f0efea;
   --bg-input: #ffffff;
-  --bg-hover: #e2e8f0;
-  
-  --border-subtle: #e2e8f0;
-  --border-strong: #cbd5e1;
-  
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
-  --accent-subtle: #eff6ff;
-  
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #94a3b8;
-  
-  --success: #16a34a;
-  --warning: #d97706;
-  --danger: #dc2626;
+  --bg-hover: #e6e4dd;
+
+  --border-subtle: #dfdcd3;
+  --border-strong: #c3bfb3;
+
+  --accent: #0f766e;
+  --accent-hover: #0d645d;
+  --accent-subtle: rgba(15, 118, 110, 0.09);
+  --accent-text: #0d665f;
+  --on-accent: #ffffff;
+
+  --text-primary: #1b1f24;
+  --text-secondary: #464e58;
+  --text-muted: #626b77;
+
+  --success: #15803d;
+  --warning: #a16207;
+  --danger: #b91c1c;
+
+  /* Code syntax */
+  --syn-keyword: #b4432c;
+  --syn-string: #2f7a3a;
+  --syn-number: #98570a;
+  --syn-comment: #66707c;
+  --syn-func: #1f6fa5;
+  --syn-type: #8a5a00;
+  --syn-prop: #3b5b80;
+  --syn-punct: #56606c;
+
+  --shadow-pop: 0 12px 40px -8px rgba(20, 24, 28, 0.22), 0 2px 8px rgba(20, 24, 28, 0.08);
+  --shadow-card: 0 1px 2px rgba(20, 24, 28, 0.05);
+  --scrim: rgba(24, 27, 31, 0.42);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast: 120ms;
+  --dur: 200ms;
+  --dur-slow: 320ms;
 
   /* Compatibility fallbacks */
   --bg-primary: var(--bg-app);
@@ -52,29 +81,43 @@
 }
 
 .dark {
-  /* Dark Mode Surface Palette — Refined Neutral Slate / Zinc */
-  --bg-app: #090d14;
-  --bg-surface: #0f141f;
-  --bg-card: #151b29;
-  --bg-input: #0b101a;
-  --bg-hover: #1d2538;
-  
-  --border-subtle: #1e2638;
-  --border-strong: #2c3750;
-  
-  --accent: #3b82f6;
-  --accent-hover: #60a5fa;
-  --accent-subtle: rgba(59, 130, 246, 0.12);
-  
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  
-  --success: #22c55e;
-  --warning: #f59e0b;
-  --danger: #ef4444;
+  /* Dark — graphite */
+  --bg-app: #0c0e11;
+  --bg-surface: #121519;
+  --bg-card: #171b20;
+  --bg-input: #0e1115;
+  --bg-hover: #1f242a;
 
-  /* Compatibility fallbacks */
+  --border-subtle: rgba(255, 255, 255, 0.075);
+  --border-strong: rgba(255, 255, 255, 0.15);
+
+  --accent: #1a8576;
+  --accent-hover: #21998a;
+  --accent-subtle: rgba(76, 201, 182, 0.12);
+  --accent-text: #4cc9b6;
+  --on-accent: #ffffff;
+
+  --text-primary: #e8ebef;
+  --text-secondary: #a6b0bc;
+  --text-muted: #8590a0;
+
+  --success: #3ccb8f;
+  --warning: #e6ac3a;
+  --danger: #f0686a;
+
+  --syn-keyword: #e8836b;
+  --syn-string: #8cc78b;
+  --syn-number: #dba660;
+  --syn-comment: #7f8b99;
+  --syn-func: #6db8e3;
+  --syn-type: #e3c078;
+  --syn-prop: #a3bddb;
+  --syn-punct: #93a0ae;
+
+  --shadow-pop: 0 16px 48px -8px rgba(0, 0, 0, 0.7), 0 2px 10px rgba(0, 0, 0, 0.4);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --scrim: rgba(3, 5, 7, 0.66);
+
   --bg-primary: var(--bg-app);
   --bg-secondary: var(--bg-surface);
   --bg-tertiary: var(--bg-card);
@@ -90,12 +133,30 @@ body {
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+/* Accent-coloured text/icons use the text-safe shade (the fill shade is tuned for white-on-accent buttons). */
+.text-\[var\(--accent\)\],
+.hover\:text-\[var\(--accent\)\]:hover,
+.group:hover .group-hover\:text-\[var\(--accent\)\] {
+  color: var(--accent-text);
 }
 
 /* Accessible focus styling */
 *:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
 }
 
 /* Custom scrollbars */
@@ -104,8 +165,8 @@ body {
   scrollbar-color: var(--border-strong) transparent;
 }
 *::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 *::-webkit-scrollbar-track {
   background: transparent;
@@ -113,9 +174,94 @@ body {
 *::-webkit-scrollbar-thumb {
   background-color: var(--border-subtle);
   border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
 }
 *::-webkit-scrollbar-thumb:hover {
   background-color: var(--border-strong);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Motion
+   The `animate-in` family was referenced across the app but never defined (no animation plugin is installed),
+   so those entrances silently did nothing. They are defined here.
+   ───────────────────────────────────────────────────────────────────────────── */
+@keyframes cp-fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes cp-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes cp-scale-in {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes cp-shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+@keyframes cp-pulse-ring {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-text) 45%, transparent); }
+  70%  { box-shadow: 0 0 0 7px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@keyframes cp-spin {
+  to { transform: rotate(360deg); }
+}
+
+.animate-in {
+  animation: cp-fade-up var(--dur) var(--ease-out) both;
+}
+.animate-in.fade-in {
+  animation-name: cp-fade;
+}
+.cp-fade-up { animation: cp-fade-up var(--dur-slow) var(--ease-out) both; }
+.cp-scale-in { animation: cp-scale-in var(--dur) var(--ease-out) both; }
+.cp-pulse-ring { animation: cp-pulse-ring 1.8s var(--ease-out) infinite; }
+
+/* Stagger helper: set --i on the element (style={{ '--i': index }}). */
+.cp-stagger { animation: cp-fade-up var(--dur-slow) var(--ease-out) both; animation-delay: calc(var(--i, 0) * 45ms); }
+
+/* Skeleton placeholder */
+.cp-skeleton {
+  border-radius: 8px;
+  background: linear-gradient(90deg, var(--bg-card) 25%, var(--bg-hover) 37%, var(--bg-card) 63%);
+  background-size: 400% 100%;
+  animation: cp-shimmer 1.6s linear infinite;
+}
+
+/* Faint blueprint grid used behind hero areas */
+.cp-grid {
+  background-image: radial-gradient(color-mix(in srgb, var(--text-primary) 9%, transparent) 1px, transparent 1px);
+  background-size: 22px 22px;
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 85%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 85%);
+}
+
+/* Smooth colour transitions between light and dark (only while the theme is actively switching). */
+html.cp-theme-switching *,
+html.cp-theme-switching *::before,
+html.cp-theme-switching *::after {
+  transition: background-color 240ms var(--ease-in-out), border-color 240ms var(--ease-in-out), color 240ms var(--ease-in-out), fill 240ms var(--ease-in-out) !important;
+}
+
+/* Interactive affordances shared by cards */
+.cp-lift {
+  transition: transform var(--dur) var(--ease-out), border-color var(--dur) var(--ease-out), background-color var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out);
+}
+.cp-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-pop);
+}
+.cp-press:active {
+  transform: scale(0.97);
+}
+button, [role='button'] {
+  transition-property: background-color, border-color, color, opacity, transform, box-shadow;
+  transition-duration: var(--dur-fast);
+  transition-timing-function: var(--ease-out);
 }
 
 /* Reduced motion support */
@@ -123,7 +269,9 @@ body {
   *, ::before, ::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+  .cp-lift:hover { transform: none; }
 }

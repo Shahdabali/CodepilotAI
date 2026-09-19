@@ -6,6 +6,7 @@ import { useUIStore } from '@/stores/ui.store'
 import type { FileDiff } from '@/types'
 import { cn } from '@/lib/utils'
 import { Check, X, RotateCcw, FileText, CheckCircle2 } from 'lucide-react'
+import { toast } from '@/components/ui/toast'
 
 export function DiffViewer() {
   const activeTask = useTaskStore((s) => s.activeTask)
@@ -13,6 +14,7 @@ export function DiffViewer() {
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
   const [reverting, setReverting] = useState(false)
   const [accepted, setAccepted] = useState(false)
+  const [confirmingRevert, setConfirmingRevert] = useState(false)
   const [actionMessage, setActionMessage] = useState<string | null>(null)
 
   const { data: diffs = [], isLoading, refetch } = useQuery({
@@ -41,11 +43,14 @@ export function DiffViewer() {
     try {
       await api.tasks.rollback(activeTask.id)
       setActionMessage('All changes reverted back to previous state.')
+      toast.success('Changes reverted', 'The files are back to how they were before this task.')
       refetch()
-    } catch {
+    } catch (err: any) {
       setActionMessage('Failed to revert changes.')
+      toast.error('Could not revert the changes', err?.message)
     } finally {
       setReverting(false)
+      setConfirmingRevert(false)
     }
   }
 
@@ -107,15 +112,32 @@ export function DiffViewer() {
             <Check size={13} />
             <span>{accepted ? 'Accepted' : 'Accept'}</span>
           </button>
-          <button
-            type="button"
-            onClick={handleRevert}
-            disabled={reverting}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[var(--danger)]/10 text-[var(--danger)] hover:bg-[var(--danger)]/20 border border-[var(--danger)]/20 transition-colors disabled:opacity-50"
-          >
-            <RotateCcw size={13} />
-            <span>{reverting ? 'Reverting…' : 'Revert'}</span>
-          </button>
+          {confirmingRevert ? (
+            <div className="flex items-center gap-1.5" role="alertdialog" aria-label="Confirm revert">
+              <span className="text-xs text-[var(--text-secondary)]">Restore every file to before this task?</span>
+              <button
+                type="button"
+                onClick={handleRevert}
+                disabled={reverting}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[var(--danger)] text-white hover:brightness-110 transition disabled:opacity-50"
+              >
+                <RotateCcw size={13} />
+                <span>{reverting ? 'Reverting…' : 'Yes, revert'}</span>
+              </button>
+              <button type="button" onClick={() => setConfirmingRevert(false)} disabled={reverting} className="px-2.5 py-1.5 rounded-lg text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]">
+                Keep changes
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmingRevert(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[var(--danger)]/10 text-[var(--danger)] hover:bg-[var(--danger)]/20 border border-[var(--danger)]/20 transition-colors"
+            >
+              <RotateCcw size={13} />
+              <span>Revert</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -169,7 +191,11 @@ export function DiffViewer() {
 }
 
 function DiffHunks({ diff }: { diff: FileDiff }) {
-  const lines = diff.diff.split('\n')
+  // Tolerate either field name, and drop createPatch's "Index / === / --- / +++" preamble so the view starts at the first hunk.
+  const raw = (diff.diff ?? (diff as { patch?: string }).patch ?? '').split('\n')
+  const firstHunk = raw.findIndex((l) => l.startsWith('@@'))
+  const lines = (firstHunk > 0 ? raw.slice(firstHunk) : raw).filter((l) => !l.startsWith('\\ No newline'))
+  if (lines.length && lines[lines.length - 1] === '') lines.pop()
 
   return (
     <div className="min-w-full rounded-xl overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-surface)]">

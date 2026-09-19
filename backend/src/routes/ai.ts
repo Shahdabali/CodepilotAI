@@ -43,15 +43,27 @@ export const aiPlugin: FastifyPluginAsync = async (fastify) => {
     return reply.send({ models });
   });
 
+  // GET /api/ai/nvidia/models - Discover active models live from NVIDIA endpoint
+  fastify.get('/api/ai/nvidia/models', async (_request, reply) => {
+    await aiRouter.syncWithSettings();
+    const provider = aiRouter.getProvider('nvidia') as any;
+    if (!provider) {
+      return reply.code(404).send({ error: 'NVIDIA provider not found' });
+    }
+    const models = await provider.discoverModels(true);
+    return reply.send({ models });
+  });
+
   // POST /api/ai/test - Test credentials and latency for a specific provider
   fastify.post<{
     Body: {
       providerId: string;
       apiKey?: string;
       baseUrl?: string;
+      model?: string;
     };
   }>('/api/ai/test', async (request, reply) => {
-    const { providerId, apiKey, baseUrl } = request.body || {};
+    const { providerId, apiKey, baseUrl, model } = request.body || {};
     if (!providerId) {
       return reply.code(400).send({ error: 'providerId is required' });
     }
@@ -68,11 +80,24 @@ export const aiPlugin: FastifyPluginAsync = async (fastify) => {
     if (baseUrl && (provider as any).setBaseURL) {
       (provider as any).setBaseURL(baseUrl);
     }
+    if (model && (provider as any).setModel) {
+      (provider as any).setModel(model);
+    }
     if (providerId === 'ollama' && apiKey === undefined) {
       (provider as any).setEnabled?.(true);
     }
 
     try {
+      if (providerId === 'nvidia' && typeof (provider as any).detailedHealthCheck === 'function') {
+        const detailedHealth = await (provider as any).detailedHealthCheck();
+        const success = detailedHealth.overall === 'pass' || detailedHealth.overall === 'partial';
+        return reply.send({
+          success,
+          health: detailedHealth,
+          detailedHealth,
+        });
+      }
+
       const health = await provider.healthCheck();
       return reply.send({ success: health.status === 'available', health });
     } catch (err: any) {

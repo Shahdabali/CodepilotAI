@@ -8,6 +8,7 @@ interface ProjectStore {
   setActiveProject: (project: Project | null) => void
   updateProject: (id: string, updates: Partial<Project>) => void
   addProject: (project: Project) => void
+  removeProject: (id: string) => void
 }
 
 export const useProjectStore = create<ProjectStore>((set) => ({
@@ -29,7 +30,13 @@ export const useProjectStore = create<ProjectStore>((set) => ({
 
   addProject: (project) =>
     set((state) => ({
-      projects: [project, ...state.projects],
+      projects: [project, ...state.projects.filter((p) => p.id !== project.id)],
       activeProject: project,
+    })),
+
+  removeProject: (id) =>
+    set((state) => ({
+      projects: state.projects.filter((p) => p.id !== id),
+      activeProject: state.activeProject?.id === id ? null : state.activeProject,
     })),
 }))
